@@ -10,16 +10,88 @@ library(dplyr)
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("\Dropbox (University of Oregon)")
 
-setwd("Thesis_Emanuelle/Chapter_1-Scientometric/geo_data")
+setwd("network-bias-saved")
+
+## ***********************************************
+## Cleaning country data and GDP
+## ***********************************************
+
+web.loc <- read.csv("Scientiometric_Data_3_jun_2.csv",  sep=";")
+
+gdp <- read.csv("gdp.csv")
+
+## fix issues
+web.loc$Country[web.loc$Country == "Puerto Rico"] <- "USA"
+web.loc$Country[web.loc$Country == "Hawaii"] <- "USA"
+
+web.loc$Country[web.loc$Country == "New Zealand "] <- "New Zealand"
+
+## webs without countries
+sum(web.loc$Country == "")
+
+web.loc$Country[web.loc$Country == ""] <- NA
+
+## count up the webs in each country
+country.real.dat <- table(web.loc$Country)
+
+## which countries in the data are not in the gdp
+names(country.real.dat)[!names(country.real.dat) %in% gdp$Country.Name]
+
+web.loc$Country[web.loc$Country == "Moroco"] <- "Morocco"
+web.loc$Country[web.loc$Country == "USA"] <- "United States"
+web.loc$Country[web.loc$Country == "UK"] <- "United Kingdom"
+web.loc$Country[web.loc$Country == "England"] <- "United Kingdom"
+web.loc$Country[web.loc$Country == "Venezuela"] <- "Venezuela, RB"
+web.loc$Country[web.loc$Country == "Egypt"] <- "Egypt, Arab Rep."
+
+## because Greenland is a territory of Denmark, the gdp we would like
+## to consider is the Danish GDP
+web.loc$Country[web.loc$Country == "Greenland"] <- "Denmark"
+
+## count up the webs in each country
+country.real.dat <- table(web.loc$Country)
+
+names(country.real.dat)[!names(country.real.dat) %in% gdp$Country.Name]
+
+## remove countries with NA gdp
+gdp <- gdp[!is.na(gdp$'X2020'),]
+
+## match the countires in gdp to web data
+gdp.webs <- gdp[gdp$Country.Name %in% names(country.real.dat),]
+
+## match the countries in web data to gdp
+
+country.real.dat <- country.real.dat[names(country.real.dat) %in%
+                                 gdp.webs$Country.Name]
+
+## subset to 2020
+gdp.2020 <- gdp.webs[, c("Country.Name", "X2020")]
+
+## alphabetize names
+gdp.2020  <- gdp.2020[order(gdp.2020$Country.Name),]
+country.real.dat <- country.real.dat[order(names(country.real.dat))]
+
+names(country.real.dat) == gdp.2020$Country.Name
+
+save(country.real.dat,
+     file="saved/real_country_counts.Rdata")
+
+save(gdp.2020,
+     file="saved/GDP_country.Rdata")
+
+write.csv(web.loc, file="cleaned_web_data.csv",
+          row.names=FALSE)
+
+
+## ***********************************************
+## Biomes
+## ***********************************************
 
 ## load biome codes
-biome.code <- read.csv("../metadata/biome_codes.csv")
+biome.code <- read.csv("biome_codes.csv")
 
 ## load biome data
 biomes <- readOGR(dsn="official", layer="wwf_terr_ecos")
-
-## web data for the biome names
-web.loc <- read.csv("../final_geo_data/cleaned_web_data.csv")
 
 ## correct issues with biome names between datasets
 biome.code$BiomeName <- toupper(biome.code$BiomeName)
@@ -97,21 +169,15 @@ length(northern.real.dat) == length(n.area.biome)
 names(northern.real.dat) == names(n.area.biome)
 
 save(n.area.biome, s.area.biome, globe.area.biome,
-     file="../final_geo_data/biome_area.Rdata")
+     file="saved/biome_area.Rdata")
 
 save(northern.real.dat, southern.real.dat, globe.real.dat,
-     file="../final_geo_data/real_biome_counts.Rdata")
-
-
+     file="saved/real_biome_counts.Rdata")
 
 ## ***********************************************
 ## Area by country
 ## ***********************************************
-
-
-countries <- read.csv("../metadata/bees_by_country.csv")
-web.loc <- read.csv("../metadata/Scientiometric_Data_3_jun_2.csv",
-                    h=T, sep=";")
+countries <- read.csv("bees_by_country.csv")
 
 sort(countries$NAME[!countries$NAME %in% web.loc$Country])
 
@@ -134,13 +200,17 @@ names(countries)[!names(countries) %in% bee.net$ISO3]
 ## set NAs to zero in the network dataset
 bee.net$n[is.na(bee.net$n)] <- 0
 
+studies.by.country <- bee.net$n
+save(studies.by.country,
+     file="saved/study_counts_ISO.Rdata")
+
 ## drop countries without bee species richness data
 bee.net <- bee.net[!is.na(bee.net$CL_Species),]
 
 #separating data
-networks <- bee.net$n
-bee.div <- bee.net$CL_Species
+bee.div.by.country <- bee.net$CL_Species
 
-## likelihood tests
-dmultinom(networks, prob=bee.div)
+save(bee.div.by.country,
+     file="saved/bee_div_ISO.Rdata")
+
 
