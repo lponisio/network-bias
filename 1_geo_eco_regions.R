@@ -1,13 +1,14 @@
 rm(list=ls())
-library(tidyverse)    # our old friend
-library(rgdal)        # main spatial package
-library(maptools)     # tools for manipulating spatial data
+library(tidyverse)
+library(rgdal)
+library(maptools)
 library(dplyr)
 
 ## This script calculates the area for each biome globally and in the
 ## N and S hemisphere
 
-setwd("~/Dropbox (University of Oregon)/")
+## setwd("~/Dropbox (University of Oregon)/")
+setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
