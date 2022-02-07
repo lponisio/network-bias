@@ -7,8 +7,8 @@ library(dplyr)
 ## This script calculates the area for each biome globally and in the
 ## N and S hemisphere
 
-## setwd("~/Dropbox (University of Oregon)/")
-setwd("/Volumes/bombus/Dropbox (University of Oregon)")
+setwd("~/Dropbox (University of Oregon)/")
+## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
@@ -176,13 +176,17 @@ save(northern.real.dat, southern.real.dat, globe.real.dat,
      file="saved/real_biome_counts.Rdata")
 
 ## ***********************************************
-## Area by country
+## Area/diversity by country
 ## ***********************************************
 countries <- read.csv("bees_by_country.csv")
 
+bad.countries <- c("", "KP", "KR", "VAT", "FM")
+countries <- countries[!countries$ISO3 %in%
+                       bad.countries,]
+
 sort(countries$NAME[!countries$NAME %in% web.loc$Country])
 
-sort(unique(web.loc$Country))
+## sort(unique(web.loc$Country))
 
 #number of networks per country
 net.country <- web.loc %>%
@@ -193,7 +197,7 @@ bee.net <- merge(net.country, countries, by.x='ISO3',
                  by.y='ISO3', all.y = T)
 
 #checking names
-names(countries)[!names(countries) %in% bee.net$ISO3]
+countries$ISO3[!(countries$ISO3) %in% bee.net$ISO3]
 
 ## net.country <- net.country[!net.country$ISO3 %in%
 ##                            unique(bee.net$ISO3),]
@@ -202,16 +206,69 @@ names(countries)[!names(countries) %in% bee.net$ISO3]
 bee.net$n[is.na(bee.net$n)] <- 0
 
 studies.by.country <- bee.net$n
-save(studies.by.country,
-     file="saved/study_counts_ISO.Rdata")
+names(studies.by.country) <- bee.net$ISO3
+
+
+area.by.country <- bee.net$AREA
+area.by.country <- as.numeric(area.by.country)
+names(area.by.country) <- bee.net$ISO3
 
 ## drop countries without bee species richness data
-bee.net <- bee.net[!is.na(bee.net$CL_Species),]
+## bee.net <- bee.net[!is.na(bee.net$CL_Species),]
 
-#separating data
+##separating data
 bee.div.by.country <- bee.net$CL_Species
+names(bee.div.by.country) <-  bee.net$ISO3
 
-save(bee.div.by.country,
-     file="saved/bee_div_ISO.Rdata")
+bee.div.by.country <- bee.div.by.country[!is.na(bee.div.by.country)]
+
+save(studies.by.country, bee.div.by.country,
+     area.by.country,
+     file="saved/ISO.Rdata")
 
 
+##
+
+net.country.decade <- web.loc %>%
+    group_by(ISO3, Publi_Decade) %>%
+    summarise(Count = length(ISO3))
+
+
+net.country.decade <- net.country.decade[net.country.decade$ISO3 !=
+                                         "#N/A",]
+
+library(vegan)
+
+
+## This functions takes site-species-abundance data and creates a
+## matrix where the sites are columns and the rows are species.
+
+samp2site.spp <- function(site, spp, abund, FUN=sum) {
+  x <- tapply(abund, list(site = site, spp = spp), FUN)
+  x[is.na(x)] <- 0
+  return(x)
+}
+
+by.decade <- split(net.country.decade,
+                   net.country.decade$Publi_Decade)
+
+by.decade <- by.decade[sapply(by.decade, nrow) > 5]
+
+decade.cat <- unlist(sapply(by.decade, function(x) x$Publi_Decade))
+names(decade.cat) <- NULL
+
+by.decade.mat <- lapply(by.decade, samp2site.spp, samp2site.spp=
+
+dist.mat <- vegdist(comm.mat, method= "jaccard",
+                    na.rm=TRUE, diag=TRUE)
+
+beta.disper.result <- betadisper(dist.mat, GenSp,
+                                 type="centroid")
+
+## Permutation test for F and simulate missing values to compare the
+## differences in the variances of the community composition of
+## parasites between bee species
+
+perm.test <- permutest(beta.disper.result,
+          control = permControl(nperm = 100),
+          pairwise = TRUE)
