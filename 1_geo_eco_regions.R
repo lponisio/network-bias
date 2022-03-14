@@ -7,10 +7,10 @@ library(dplyr)
 ## This script calculates the area for each biome globally and in the
 ## N and S hemisphere
 
-## setwd("~/Dropbox (University of Oregon)/")
+setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
-setwd("C:/Users/emanu/Dropbox (University of Oregon)")
+## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
 
@@ -61,6 +61,7 @@ load(file="../network-bias/data/rawData.Rdata")
 
 dim(gdp)
 ## drop the codes for regions, and country groupings
+## also drop North Korea because they don't repot well
 not.real.countries <- c("WLD", "AFE", "AFW", "ARB", "CEB", "EAP",
                         "EAR", "EAS", "ECA", "ECS", "EMU", "EUU",
                         "FCS", "HIC", "HPC", "IBD", "IBT", "IDA",
@@ -70,7 +71,7 @@ not.real.countries <- c("WLD", "AFE", "AFW", "ARB", "CEB", "EAP",
                         "NAC", "OED", "OSS", "PRE", "PSE", "PSS",
                         "PST",
                         "SAS", "SSA", "SSF", "SST", "TEA", "TEC",
-                        "TLA", "TMM", "TSA", "TSS", "UMC"
+                        "TLA", "TMM", "TSA", "TSS", "UMC", "PRK"
                         )
 
 dim(gdp)- length(not.real.countries)
@@ -252,6 +253,52 @@ head(res.inv.web.dat)
 save(res.inv.web.dat,
      file="saved/res_inv_web.Rdata")
 
+
+## ***********************************************
+## Area/diversity by country
+## ***********************************************
+## tiny countries that are not "real"
+
+## KP = north korea (don't good data report), VAT= vatican, FM
+## (micronesia)
+
+bad.countries <- c("", "KP", "VAT", "FM")
+countries <- countries[!countries$ISO3 %in%
+                       bad.countries,]
+
+
+
+## fix north korea code
+countries$ISO3[countries$ISO3  == "KR"]  <- "KOR"
+
+
+sort(unique(countries$NAME))
+
+countries <- countries[, c("NAME", "ISO3", "AREA", "CL_Species")]
+
+## in gdp
+countries[countries$ISO3 %in% gdp$Country.Code,]
+
+## not in gpd
+countries[!countries$ISO3 %in% gdp$Country.Code,]
+
+
+#merging networks and bee richness by country
+country.area.web.dat <- data.frame(
+    "Country.Code" =names(country.real.dat),
+    "Web.count" = country.real.dat)
+rownames(country.area.web.dat ) <- NULL
+
+country.area.web.dat <- merge(country.area.web.dat,
+                              countries,
+                               by.x = "Country.Code", by.y = "ISO3",
+                              all =TRUE)
+
+
+## must decide whether to drop or are they real
+country.area.web.dat[is.na(country.area.web.dat$Web.count),]
+
+
 ## ***********************************************
 ## Biomes
 ## ***********************************************
@@ -339,53 +386,6 @@ save(n.area.biome, s.area.biome, globe.area.biome,
 
 save(northern.real.dat, southern.real.dat, globe.real.dat,
      file="saved/real_biome_counts.Rdata")
-
-## ***********************************************
-## Area/diversity by country
-## ***********************************************
-bad.countries <- c("", "KP", "KR", "VAT", "FM")
-countries <- countries[!countries$ISO3 %in%
-                       bad.countries,]
-
-sort(countries$NAME[!countries$NAME %in% webs$Country])
-
-## sort(unique(webs$Country))
-
-#number of networks per country
-net.country <- webs %>%
-                count(ISO3)
-
-#merging networks and bee richness by country
-bee.net <- merge(net.country, countries, by.x='ISO3',
-                 by.y='ISO3', all.y = T)
-
-#checking names
-countries$ISO3[!(countries$ISO3) %in% bee.net$ISO3]
-
-## net.country <- net.country[!net.country$ISO3 %in%
-##                            unique(bee.net$ISO3),]
-
-## set NAs to zero in the network dataset
-bee.net$n[is.na(bee.net$n)] <- 0
-
-studies.by.country <- bee.net$n
-names(studies.by.country) <- bee.net$ISO3
-
-
-area.by.country <- bee.net$AREA
-area.by.country <- as.numeric(area.by.country)
-names(area.by.country) <- bee.net$ISO3
-
-##separating data
-bee.div.by.country <- bee.net$CL_Species
-names(bee.div.by.country) <-  bee.net$ISO3
-
-bee.div.by.country <- bee.div.by.country[!is.na(bee.div.by.country)]
-
-save(studies.by.country, bee.div.by.country,
-     area.by.country,
-     file="saved/ISO.Rdata")
-
 
 save( webs, file="saved/webs.Rdata")
 ##
