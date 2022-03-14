@@ -7,8 +7,8 @@ library(dplyr)
 ## This script calculates the area for each biome globally and in the
 ## N and S hemisphere
 
-setwd("~/Dropbox (University of Oregon)/")
-## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
+## setwd("~/Dropbox (University of Oregon)/")
+setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
@@ -17,39 +17,46 @@ setwd("network-bias-saved")
 ## General cleaning of web data
 ## ***********************************************
 
-webs <- read.csv("network_papers_2021.csv",  sep=";")
+## webs <- read.csv("network_papers_2021.csv",  sep=";")
+## res.inv <- read.csv("research_expenditure.csv")
+## gdp <- read.csv("gdp.csv")
+## biome.code <- read.csv("biome_codes.csv")
+## countries <- read.csv("bees_by_country.csv")
 
-gdp <- read.csv("gdp.csv")
+## ## fix issues in country names just to have them correct no longer
+## ## used for matching data
+## webs$Country[webs$Country == "Puerto Rico"] <- "USA"
+## webs$Country[webs$Country == "Hawaii"] <- "USA"
+## webs$Country[webs$Country == "New Zealand "] <- "New Zealand"
+## webs$Country[webs$Country == "Moroco"] <- "Morocco"
+## webs$Country[webs$Country == "USA"] <- "United States"
+## webs$Country[webs$Country == "UK"] <- "United Kingdom"
+## webs$Country[webs$Country == "England"] <- "United Kingdom"
+## webs$Country[webs$Country == "Venezuela"] <- "Venezuela, RB"
+## webs$Country[webs$Country == "Egypt"] <- "Egypt, Arab Rep."
 
-## fix issues in country names just to have them correct no longer
-## used for matching data
-webs$Country[webs$Country == "Puerto Rico"] <- "USA"
-webs$Country[webs$Country == "Hawaii"] <- "USA"
-webs$Country[webs$Country == "New Zealand "] <- "New Zealand"
-webs$Country[webs$Country == "Moroco"] <- "Morocco"
-webs$Country[webs$Country == "USA"] <- "United States"
-webs$Country[webs$Country == "UK"] <- "United Kingdom"
-webs$Country[webs$Country == "England"] <- "United Kingdom"
-webs$Country[webs$Country == "Venezuela"] <- "Venezuela, RB"
-webs$Country[webs$Country == "Egypt"] <- "Egypt, Arab Rep."
+## ## webs without countries, nothing we can do here
+## sum(webs$Country == "")
+## webs$Country[webs$Country == ""] <- NA
+## webs$ISO3[webs$ISO3 == ""] <- NA
+## webs <- webs[!is.na(webs$Country),]
 
-## webs without countries, nothing we can do here
-sum(webs$Country == "")
-webs$Country[webs$Country == ""] <- NA
-webs$ISO3[webs$ISO3 == ""] <- NA
-webs <- webs[!is.na(webs$Country),]
+## ## count up the webs in each country
+## country.real.dat <- table(webs$ISO3)
+## sort(country.real.dat)
 
-## count up the webs in each country
-country.real.dat <- table(webs$ISO3)
-sort(country.real.dat)
+## ## all should have a country code now
+## names(country.real.dat)[!names(country.real.dat) %in%
+##                         gdp$Country.Code]
 
-## all should have a country code now
-names(country.real.dat)[!names(country.real.dat) %in% gdp$Country.Code]
+## save(webs, res.inv, gdp, biome.code, countries, country.real.dat,
+##      file="../network-bias/data/rawData.Rdata")
 
 ## ***********************************************
 ## join the web data with the gdp data
 ## clean gdp data
 ## **********************************************
+load(file="../network-bias/data/rawData.Rdata")
 
 dim(gdp)
 ## drop the codes for regions, and country groupings
@@ -154,7 +161,6 @@ gdp$Country.Code[gdp.web.dat$GDP.2020 == min(gdp.web.dat$GDP.2020)]
 ## ***********************************************
 ## research investment by country
 ## ***********************************************
-res.inv <- read.csv("research_expenditure.csv")
 dim(res.inv)
 
 res.inv <- res.inv[!res.inv$Country.Code %in%  not.real.countries,]
@@ -249,9 +255,6 @@ save(res.inv.web.dat,
 ## Biomes
 ## ***********************************************
 
-## load biome codes
-biome.code <- read.csv("biome_codes.csv")
-
 ## load biome data
 biomes <- readOGR(dsn="official", layer="wwf_terr_ecos")
 
@@ -339,8 +342,6 @@ save(northern.real.dat, southern.real.dat, globe.real.dat,
 ## ***********************************************
 ## Area/diversity by country
 ## ***********************************************
-countries <- read.csv("bees_by_country.csv")
-
 bad.countries <- c("", "KP", "KR", "VAT", "FM")
 countries <- countries[!countries$ISO3 %in%
                        bad.countries,]
@@ -385,7 +386,7 @@ save(studies.by.country, bee.div.by.country,
      file="saved/ISO.Rdata")
 
 
-save( webs,    file="saved/webs.Rdata")
+save( webs, file="saved/webs.Rdata")
 ##
 
 ## net.country.decade <- webs %>%
