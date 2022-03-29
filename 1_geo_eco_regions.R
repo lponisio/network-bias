@@ -10,7 +10,7 @@ library(dplyr)
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
-## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
+## ("C:/Users/emanu/Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
 
@@ -62,7 +62,7 @@ load(file="../network-bias/data/rawData.Rdata")
 dim(gdp)
 ## drop the codes for regions, and country groupings
 ## also drop North Korea because they don't repot well
-not.real.countries <- c("WLD", "AFE", "AFW", "ARB", "CEB", "EAP",
+not.real.countries <- c("WLD", "AFE", "AFW", "ARB", "CEB", "CSS", "EAP",
                         "EAR", "EAS", "ECA", "ECS", "EMU", "EUU",
                         "FCS", "HIC", "HPC", "IBD", "IBT", "IDA",
                         "IDB",
@@ -155,6 +155,8 @@ write.csv(webs, file="cleaned_web_data.csv",
           row.names=FALSE)
 
 hist(log(gdp.web.dat$GDP.2020))
+
+#high and low gdp values
 gdp$Country.Code[gdp.web.dat$GDP.2020 == max(gdp.web.dat$GDP.2020)]
 gdp$Country.Code[gdp.web.dat$GDP.2020 == min(gdp.web.dat$GDP.2020)]
 
@@ -194,11 +196,10 @@ res.inv$ResInvestTotal <- res.inv$PropGDP_median*res.inv$gdp
 ## drop NAs
 res.inv <- res.inv[!is.na(res.inv$ResInvestTotal),]
 
-## usa is max
+## high and low values of research investment
 res.inv$Country.Code[res.inv$ResInvestTotal ==
                      max(res.inv$ResInvestTotal)]
 
-## min is an island
 res.inv$Country.Code[res.inv$ResInvestTotal ==
                           min(res.inv$ResInvestTotal)]
 
@@ -217,7 +218,7 @@ no.webs <- res.inv$Country.Code[!res.inv$Country.Code %in%
 no.webs
 ## since we already fixed this with gdp we are good
 
-## countries with no  res investment data but webs
+## countries with no research investment data but webs
 ## EB: to check
 no.res.inv <- names(country.real.dat.gdp)[!names(country.real.dat.gdp) %in%
                             res.inv$Country.Code]
@@ -225,6 +226,14 @@ no.res.inv
 
 sort(country.real.dat.gdp[no.res.inv])
 
+#countries with gdp but no research investment
+
+no.res.inv <- as.data.frame(no.res.inv)
+no.res.inv.gdp <- gdp.20.yr.median[order(gdp.20.yr.median$gdp),]
+countries.gdp <- merge(no.res.inv.gdp, no.res.inv, by.x = "Country.Code", by.y = "no.res.inv", all.y = T)
+countries.gdp <- countries.gdp[order(countries.gdp$gdp),]
+
+#countries with no research investment
 
 country.real.dat.res.inv <-
     country.real.dat.gdp[!names(country.real.dat.gdp) %in% no.res.inv]
