@@ -1,19 +1,15 @@
+rm(list=ls())
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
 
-## "globe.area.biome"   "n.area.biome"       "s.area.biome"
-load('saved/biome_area.Rdata')
-## gdp.2020
-load('saved/GDP_country.Rdata')
-## "globe.real.dat"    "northern.real.dat" "southern.real.dat"
-load('saved/real_biome_counts.Rdata')
-## country.real.dat
-load('saved/real_country_counts.Rdata')
-## studies.by.country, area.by.country, bee.div.by.country
-load('saved/ISO.Rdata')
+## biome.webs
+load('saved/area_richness_web.Rdata')
+load('saved/biome_webs.Rdata')
+load('saved/GDP_web.Rdata')
+load('saved/res_inv_web.Rdata')
 
 library(ggplot2)
 
@@ -21,14 +17,21 @@ library(ggplot2)
 ## AREA by biome
 ## ***********************************************
 ## likelihood tests
-dmultinom(globe.real.dat, prob=globe.area.biome)
-dmultinom(northern.real.dat, prob=n.area.biome)
-dmultinom(southern.real.dat, prob=s.area.biome)
+dmultinom(biome.webs$GlobalWebs, prob=biome.webs$GlobalArea)
+dmultinom(biome.webs$NorthernWebs, prob=biome.webs$NorthernArea)
+dmultinom(biome.webs$SouthernWebs[!is.na(biome.webs$SouthernArea)],
+          prob=biome.webs$SouthernArea[!is.na(biome.webs$SouthernArea)])
 
 ## likelihood tests without tundra
-dmultinom(globe.real.dat[-11], prob=globe.area.biome[-11])
-dmultinom(northern.real.dat[-11], prob=n.area.biome[-11])
-dmultinom(southern.real.dat[-9], prob=s.area.biome[-9])
+dmultinom(biome.webs$GlobalWebs[biome.webs$BiomeName != "TUNDRA"],
+          prob=biome.webs$GlobalArea[biome.webs$BiomeName != "TUNDRA"])
+dmultinom(biome.webs$NorthernWebs[biome.webs$BiomeName != "TUNDRA"],
+          prob=biome.webs$NorthernArea[biome.webs$BiomeName != "TUNDRA"])
+dmultinom(biome.webs$SouthernWebs[!is.na(biome.webs$SouthernArea) &
+                                  biome.webs$BiomeName != "TUNDRA"],
+          prob=biome.webs$SouthernArea[!is.na(biome.webs$SouthernArea) &
+                                       biome.webs$BiomeName != "TUNDRA"])
+
 
 ## prop.area.n  <- n.area.biome/globe.area.biome
 
@@ -41,6 +44,8 @@ dmultinom(southern.real.dat[-9], prob=s.area.biome[-9])
 ##             round(prop.area.n[i], 3)))
 ##     }
 
+
+## move to plotting code
 ## ## differences in probabilities
 ## diffs <- as.data.frame((globe.real.dat/sum(globe.real.dat) -
 ##         globe.area.biome/sum(globe.area.biome)))
@@ -61,14 +66,19 @@ dmultinom(southern.real.dat[-9], prob=s.area.biome[-9])
 ## GDP by country
 ## ***********************************************
 
-dmultinom(country.real.dat, prob=gdp.2020$'X2020')
+dmultinom(gdp.web.dat$Web.count, prob=gdp.web.dat$GDP.MEDIAN)
 
 ## remove China and the US
 outliers <- c("China", "United States")
 
+
+## to fix names
 dmultinom(country.real.dat[!names(country.real.dat) %in% outliers],
           prob=gdp.2020$'X2020'[!gdp.2020$Country.Name %in% outliers])
 
+
+
+## move to plotting code
 ## differences in probabilities
 diffs <- as.data.frame(sort((country.real.dat/sum(country.real.dat) -
         gdp.2020$'X2020'/sum(gdp.2020$'X2020'))))

@@ -124,16 +124,30 @@ country.real.dat.gdp <-
     country.real.dat.gdp[names(country.real.dat.gdp) %in%
                          gdp$Country.Code]
 
-## subset to 2020
-gdp.2020 <- gdp[, c("Country.Code", "X2020")]
+
+## need the gdp to convert proportion to $$
+twty.yrs.gdp <- gdp[, grep("2000",
+                         colnames(gdp)):grep("2020",
+                                                 colnames(gdp))]
+
+gdp.20.yr.median <- apply(twty.yrs.gdp, 1, median, na.rm=TRUE)
+
+gdp.20.yr.median <- data.frame("GDP.MEDIAN"=gdp.20.yr.median,
+                               "Country.Code" =gdp$Country.Code)
+rownames(gdp.20.yr.median) <- NULL
+
+gdp <- merge(gdp, gdp.20.yr.median, by="Country.Code")
+
+## subset to median
+gdp.median <- gdp[, c("Country.Code", "GDP.MEDIAN")]
 
 ## alphabetize names
-gdp.2020  <- gdp.2020[order(gdp.2020$Country.Code),]
+gdp.median  <- gdp.median[order(gdp.median$Country.Code),]
 
 country.real.dat.gdp <- country.real.dat.gdp[order(
     names(country.real.dat.gdp))]
 
-names(country.real.dat.gdp) == gdp.2020$Country.Code
+names(country.real.dat.gdp) == gdp.median$Country.Code
 
 ## join gdp data and web count data
 
@@ -143,9 +157,8 @@ gdp.web.dat <- data.frame(
 rownames(gdp.web.dat) <- NULL
 
 gdp.web.dat  <- merge(gdp.web.dat,
-                      gdp.2020)
+                      gdp.median)
 
-colnames(gdp.web.dat) <- c(colnames(gdp.web.dat)[-3], "GDP.2020")
 head(gdp.web.dat)
 
 save(gdp.web.dat,
@@ -154,11 +167,13 @@ save(gdp.web.dat,
 write.csv(webs, file="cleaned_web_data.csv",
           row.names=FALSE)
 
-hist(log(gdp.web.dat$GDP.2020))
+layout(matrix(1:3, ncol=3))
+hist(log(gdp.web.dat$GDP.MEDIAN), main="GDP 20 year median", xlab="GDP in dollars (log)",
+     ylab="Number of countries")
 
 #high and low gdp values
-gdp$Country.Code[gdp.web.dat$GDP.2020 == max(gdp.web.dat$GDP.2020)]
-gdp$Country.Code[gdp.web.dat$GDP.2020 == min(gdp.web.dat$GDP.2020)]
+gdp$Country.Code[gdp.web.dat$GDP.MEDIAN == max(gdp.web.dat$GDP.MEDIAN)]
+gdp$Country.Code[gdp.web.dat$GDP.MEDIAN == min(gdp.web.dat$GDP.MEDIAN)]
 
 ## (YAY)
 
@@ -175,31 +190,36 @@ twty.yrs <- res.inv[, grep("2000",
                          colnames(res.inv)):grep("2020",
                                                  colnames(res.inv))]
 
-## need the gdp to convert proportion to $$
-twty.yrs.gdp <- gdp[, grep("2000",
-                         colnames(gdp)):grep("2020",
-                                                 colnames(gdp))]
+## ## need the gdp to convert proportion to $$
+## twty.yrs.gdp <- gdp[, grep("2000",
+##                          colnames(gdp)):grep("2020",
+##                                                  colnames(gdp))]
 
 res.inv$PropGDP_median <- apply(twty.yrs, 1, median, na.rm=TRUE)
 
-gdp.20.yr.median <- apply(twty.yrs.gdp, 1, median, na.rm=TRUE)
+## gdp.20.yr.median <- apply(twty.yrs.gdp, 1, median, na.rm=TRUE)
 
-gdp.20.yr.median <- data.frame("gdp"=gdp.20.yr.median,
-                               "Country.Code" =gdp$Country.Code)
-rownames(gdp.20.yr.median) <- NULL
+## gdp.20.yr.median <- data.frame("gdp"=gdp.20.yr.median,
+##                                "Country.Code" =gdp$Country.Code)
+## rownames(gdp.20.yr.median) <- NULL
 
-res.inv <- merge(res.inv, gdp.20.yr.median)
+res.inv <- merge(res.inv, gdp.20.yr.median, by="Country.Code")
 
 ## convert proportion to $$ by multiplying gdp and prop
-res.inv$ResInvestTotal <- res.inv$PropGDP_median*res.inv$gdp
+res.inv$ResInvestTotal <- res.inv$PropGDP_median*res.inv$GDP.MEDIAN
+
+## no gdp
+res.inv$Country.Code[is.na(res.inv$GDP.MEDIAN)]
 
 ## drop NAs
 res.inv <- res.inv[!is.na(res.inv$ResInvestTotal),]
 
 ## high and low values of research investment
+## USA
 res.inv$Country.Code[res.inv$ResInvestTotal ==
                      max(res.inv$ResInvestTotal)]
 
+## st. vincent and grenadines
 res.inv$Country.Code[res.inv$ResInvestTotal ==
                           min(res.inv$ResInvestTotal)]
 
@@ -226,19 +246,19 @@ no.res.inv
 
 sort(country.real.dat.gdp[no.res.inv])
 
-#countries with gdp but no research investment
 
-no.res.inv <- as.data.frame(no.res.inv)
-no.res.inv.gdp <- gdp.20.yr.median[order(gdp.20.yr.median$gdp),]
-countries.gdp <- merge(no.res.inv.gdp, no.res.inv, by.x = "Country.Code", by.y = "no.res.inv", all.y = T)
-countries.gdp <- countries.gdp[order(countries.gdp$gdp),]
+## no.res.inv <- as.data.frame(no.res.inv)
+## no.res.inv.gdp <- gdp.20.yr.median[order(gdp.20.yr.median$gdp),]
+## countries.gdp <- merge(no.res.inv.gdp, no.res.inv,
+##                        by.x = "Country.Code", by.y = "no.res.inv", all.y = TRUE)
+## countries.gdp <- countries.gdp[order(countries.gdp$gdp),]
 
 #countries with no research investment
 
 country.real.dat.res.inv <-
     country.real.dat.gdp[!names(country.real.dat.gdp) %in% no.res.inv]
 
-## subset to median
+## subset to country and inv data
 res.inv.median <- res.inv[, c("Country.Code", "ResInvestTotal")]
 
 ## alphabetize names
@@ -259,6 +279,10 @@ res.inv.web.dat  <- merge(res.inv.web.dat,
                       res.inv.median)
 head(res.inv.web.dat)
 
+hist(log(res.inv.web.dat$ResInvestTotal),
+     main="Research invenstment 20 year median", xlab="Investment in dollars (log)",
+     ylab="Number of countries")
+
 save(res.inv.web.dat,
      file="saved/res_inv_web.Rdata")
 
@@ -266,47 +290,72 @@ save(res.inv.web.dat,
 ## ***********************************************
 ## Area/diversity by country
 ## ***********************************************
-## tiny countries that are not "real"
 
 ## KP = north korea (don't good data report), VAT= vatican, FM
 ## (micronesia)
+area.richness <- countries
 
 bad.countries <- c("", "KP", "VAT", "FM")
-countries <- countries[!countries$ISO3 %in%
+area.richness <- area.richness[!area.richness$ISO3 %in%
                        bad.countries,]
 
-
-
 ## fix north korea code
-countries$ISO3[countries$ISO3  == "KR"]  <- "KOR"
+area.richness$ISO3[area.richness$ISO3  == "KR"]  <- "KOR"
 
+sort(unique(area.richness$NAME))
 
-sort(unique(countries$NAME))
-
-countries <- countries[, c("NAME", "ISO3", "AREA", "CL_Species")]
+area.richness <- area.richness[, c("NAME", "ISO3",
+                                   "AREA", "CL_Species")]
 
 ## in gdp
-countries[countries$ISO3 %in% gdp$Country.Code,]
+area.richness[area.richness$ISO3 %in% gdp$Country.Code,]
 
 ## not in gpd
-countries[!countries$ISO3 %in% gdp$Country.Code,]
+area.richness[!area.richness$ISO3 %in% gdp$Country.Code,]
 
 
-#merging networks and bee richness by country
+## drop really small islands that are territories and would have been
+## coded as part of the colonial empire
+
+area.richness$AREA <- as.numeric(area.richness$AREA)
+
+area.richness <- area.richness[area.richness$AREA > 1000,]
+
+## drops countries with no recorded bees
+
+area.richness <-  area.richness[!is.na(area.richness$CL_Species),]
+
+## drop islands off of Antartica/ Madagazcar because they are combined
+## but each is less than 1000 km
+area.richness <-  area.richness[area.richness$ISO3 != "ATF",]
+
+## drop Western Sahara "disputed territory"
+area.richness <-  area.richness[area.richness$ISO3 != "ESH",]
+
+
+## merging networks and bee richness by country
 country.area.web.dat <- data.frame(
     "Country.Code" =names(country.real.dat),
     "Web.count" = country.real.dat)
 rownames(country.area.web.dat ) <- NULL
 
 country.area.web.dat <- merge(country.area.web.dat,
-                              countries,
-                               by.x = "Country.Code", by.y = "ISO3",
+                              area.richness,
+                              by.x = "Country.Code",
+                              by.y = "ISO3",
                               all =TRUE)
 
 
-## must decide whether to drop or are they real
-country.area.web.dat[is.na(country.area.web.dat$Web.count),]
+## NA we count as true zeros. These are countries with GDP for usually
+## political reasons but are large areas with bees
 
+country.area.web.dat$Web.count[is.na(country.area.web.dat$Web.count)]  <- 0
+
+## no area data but yes gdp data
+country.area.web.dat[is.na(country.area.web.dat$NAME),]
+
+save(country.area.web.dat,
+     file="saved/area_richness_web.Rdata")
 
 ## ***********************************************
 ## Biomes
@@ -377,7 +426,7 @@ names(southern.real.dat) == names(s.area.biome)
 
 ## northern hemisphere
 northern.real.dat <- table(northern.webs$BiomeCode)
-globe.real.dat <- table(webs$BiomeCode)
+global.real.dat <- table(webs$BiomeCode)
 
 northern.real.dat <- c(northern.real.dat,
                        "9"=0)
@@ -390,13 +439,39 @@ length(northern.real.dat) == length(n.area.biome)
 ## check the order of names
 names(northern.real.dat) == names(n.area.biome)
 
-save(n.area.biome, s.area.biome, globe.area.biome,
-     file="saved/biome_area.Rdata")
+biome.webs <- data.frame("GlobalArea"=globe.area.biome,
+                       "BiomeCode" = names(globe.area.biome))
 
-save(northern.real.dat, southern.real.dat, globe.real.dat,
-     file="saved/real_biome_counts.Rdata")
+biome.webs$NorthernArea <- n.area.biome[
+    match(biome.webs$BiomeCode, names(n.area.biome))]
 
-save( webs, file="saved/webs.Rdata")
+
+biome.webs$SouthernArea <- s.area.biome[
+    match(biome.webs$BiomeCode, names(s.area.biome))]
+
+
+biome.webs$NorthernWebs <- northern.real.dat[
+    match(biome.webs$BiomeCode, names(northern.real.dat))]
+
+
+biome.webs$SouthernWebs <- southern.real.dat[
+    match(biome.webs$BiomeCode, names(southern.real.dat))]
+
+
+
+biome.webs$GlobalWebs <- global.real.dat[
+    match(biome.webs$BiomeCode, names(global.real.dat))]
+
+
+biome.webs$BiomeName <- biome.code$BiomeName[match(
+                                       biome.webs$BiomeCode,
+                                         biome.code$BIOME)]
+
+
+save(biome.webs,
+     file="saved/biome_webs.Rdata")
+
+
 ##
 
 ## net.country.decade <- webs %>%
