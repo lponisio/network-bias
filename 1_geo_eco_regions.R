@@ -50,6 +50,8 @@ setwd("network-bias-saved")
 ## names(country.real.dat)[!names(country.real.dat) %in%
 ##                         gdp$Country.Code]
 
+## countries <- countries[, c("NAME", "ISO3", "AREA", "CL_Species")]
+
 ## save(webs, res.inv, gdp, biome.code, countries, country.real.dat,
 ##      file="../network-bias/data/rawData.Rdata")
 
