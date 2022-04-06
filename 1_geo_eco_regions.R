@@ -10,7 +10,7 @@ library(dplyr)
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
-## ("C:/Users/emanu/Dropbox (University of Oregon)")
+setwd("C:/Users/emanu/Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
 
@@ -63,7 +63,7 @@ load(file="../network-bias/data/rawData.Rdata")
 
 dim(gdp)
 ## drop the codes for regions, and country groupings
-## also drop North Korea because they don't repot well
+## also drop North Korea because they don't report well
 not.real.countries <- c("WLD", "AFE", "AFW", "ARB", "CEB", "CSS", "EAP",
                         "EAR", "EAS", "ECA", "ECS", "EMU", "EUU",
                         "FCS", "HIC", "HPC", "IBD", "IBT", "IDA",
@@ -170,11 +170,13 @@ write.csv(webs, file="cleaned_web_data.csv",
           row.names=FALSE)
 
 layout(matrix(1:3, ncol=3))
-hist(log(gdp.web.dat$GDP.MEDIAN), main="GDP 20 year median", xlab="GDP in dollars (log)",
+hist(log(gdp.web.dat$GDP.MEDIAN), main="GDP 20 year median", xlab="GDP in US dollars (log)",
      ylab="Number of countries")
 
 #high and low gdp values
+#USA
 gdp$Country.Code[gdp.web.dat$GDP.MEDIAN == max(gdp.web.dat$GDP.MEDIAN)]
+#TUV
 gdp$Country.Code[gdp.web.dat$GDP.MEDIAN == min(gdp.web.dat$GDP.MEDIAN)]
 
 ## (YAY)
@@ -241,26 +243,17 @@ no.webs
 ## since we already fixed this with gdp we are good
 
 ## countries with no research investment data but webs
-## EB: to check
 no.res.inv <- names(country.real.dat.gdp)[!names(country.real.dat.gdp) %in%
                             res.inv$Country.Code]
 no.res.inv
 
 sort(country.real.dat.gdp[no.res.inv])
 
-
-## no.res.inv <- as.data.frame(no.res.inv)
-## no.res.inv.gdp <- gdp.20.yr.median[order(gdp.20.yr.median$gdp),]
-## countries.gdp <- merge(no.res.inv.gdp, no.res.inv,
-##                        by.x = "Country.Code", by.y = "no.res.inv", all.y = TRUE)
-## countries.gdp <- countries.gdp[order(countries.gdp$gdp),]
-
 #countries with no research investment
-
 country.real.dat.res.inv <-
     country.real.dat.gdp[!names(country.real.dat.gdp) %in% no.res.inv]
 
-## subset to country and inv data
+## subset to country and research investment data
 res.inv.median <- res.inv[, c("Country.Code", "ResInvestTotal")]
 
 ## alphabetize names
@@ -282,7 +275,7 @@ res.inv.web.dat  <- merge(res.inv.web.dat,
 head(res.inv.web.dat)
 
 hist(log(res.inv.web.dat$ResInvestTotal),
-     main="Research invenstment 20 year median", xlab="Investment in dollars (log)",
+     main="Research invenstment 20 year median", xlab="Investment in US dollars (log)",
      ylab="Number of countries")
 
 save(res.inv.web.dat,
@@ -290,19 +283,15 @@ save(res.inv.web.dat,
 
 
 ## ***********************************************
-## Area/diversity by country
+## Area and bees' diversity by country
 ## ***********************************************
 
-## KP = north korea (don't good data report), VAT= vatican, FM
-## (micronesia)
+## VAT= vatican, FM= micronesia
 area.richness <- countries
 
-bad.countries <- c("", "KP", "VAT", "FM")
+bad.countries <- c("", "VAT")
 area.richness <- area.richness[!area.richness$ISO3 %in%
                        bad.countries,]
-
-## fix north korea code
-area.richness$ISO3[area.richness$ISO3  == "KR"]  <- "KOR"
 
 sort(unique(area.richness$NAME))
 
@@ -327,9 +316,10 @@ area.richness <- area.richness[area.richness$AREA > 1000,]
 
 area.richness <-  area.richness[!is.na(area.richness$CL_Species),]
 
-## drop islands off of Antartica/ Madagazcar because they are combined
+## drop islands off of Antarctica/ Madagascar because they are combined
 ## but each is less than 1000 km
 area.richness <-  area.richness[area.richness$ISO3 != "ATF",]
+area.richness <-  area.richness[area.richness$ISO3 != "MDG",]
 
 ## drop Western Sahara "disputed territory"
 area.richness <-  area.richness[area.richness$ISO3 != "ESH",]
@@ -339,16 +329,17 @@ area.richness <-  area.richness[area.richness$ISO3 != "ESH",]
 country.area.web.dat <- data.frame(
     "Country.Code" =names(country.real.dat),
     "Web.count" = country.real.dat)
-rownames(country.area.web.dat ) <- NULL
+
+rownames(country.area.web.dat) <- NULL
 
 country.area.web.dat <- merge(country.area.web.dat,
                               area.richness,
                               by.x = "Country.Code",
                               by.y = "ISO3",
-                              all =TRUE)
+                              all = F)
 
 
-## NA we count as true zeros. These are countries with GDP for usually
+## NA we count as true zeros. These are countries without GDP for usually
 ## political reasons but are large areas with bees
 
 country.area.web.dat$Web.count[is.na(country.area.web.dat$Web.count)]  <- 0
