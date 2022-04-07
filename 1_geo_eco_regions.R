@@ -465,18 +465,6 @@ save(biome.webs,
      file="saved/biome_webs.Rdata")
 
 
-##
-
-## net.country.decade <- webs %>%
-##     group_by(ISO3, Publi_Decade) %>%
-##     summarise(Count = length(ISO3))
-
-
-## net.country.decade <- net.country.decade[net.country.decade$ISO3 !=
-##                                          "#N/A",]
-
-## library(vegan)
-
 
 ## This functions takes site-species-abundance data and creates a
 ## matrix where the sites are columns and the rows are species.

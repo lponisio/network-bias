@@ -11,8 +11,6 @@ load('saved/biome_webs.Rdata')
 load('saved/GDP_web.Rdata')
 load('saved/res_inv_web.Rdata')
 
-library(ggplot2)
-
 ## ***********************************************
 ## AREA by biome
 ## ***********************************************
@@ -33,34 +31,9 @@ dmultinom(biome.webs$SouthernWebs[!is.na(biome.webs$SouthernArea) &
                                        biome.webs$BiomeName != "TUNDRA"])
 
 
-## prop.area.n  <- n.area.biome/globe.area.biome
-
-## for(i in 1:14){
-##     print("*****")
-##     print(round(dbinom(northern.real.dat[i], globe.real.dat[i],
-##                  prop.area.n[i]), 4))
-
-##     print(c(round(northern.real.dat[i]/ globe.real.dat[i], 2),
-##             round(prop.area.n[i], 3)))
-##     }
-
-
-## move to plotting code
-## ## differences in probabilities
-## diffs <- as.data.frame((globe.real.dat/sum(globe.real.dat) -
-##         globe.area.biome/sum(globe.area.biome)))
-
-## diffs$Biome.name <- biome.code$BiomeName[match(diffs$Var1,
-##                                              biome.code$BIOME)]
-
-## diffs <- diffs[order(diffs$Freq),]
-
-## ## plot
-## p <- ggplot(data=diffs, aes(x=Biome.name, y=Freq)) +
-##     geom_bar(stat="identity") +
-##     labs(x="", y="Difference in probability based on biome area")
-## p + coord_flip()
-
+#counting the proportions
+prop.area.n <- n.area.biome/globe.area.biome
+prop.area.s <- s.area.biome/globe.area.biome
 
 ## ***********************************************
 ## GDP by country
@@ -71,32 +44,31 @@ dmultinom(gdp.web.dat$Web.count, prob=gdp.web.dat$GDP.MEDIAN)
 ## remove China and the US
 outliers <- c("China", "United States")
 
-
-## to fix names
-dmultinom(country.real.dat[!names(country.real.dat) %in% outliers],
-          prob=gdp.2020$'X2020'[!gdp.2020$Country.Name %in% outliers])
-
-
-
-## move to plotting code
-## differences in probabilities
-diffs <- as.data.frame(sort((country.real.dat/sum(country.real.dat) -
-        gdp.2020$'X2020'/sum(gdp.2020$'X2020'))))
-
-## plot
-p <- ggplot(data=diffs, aes(x=Var1, y=Freq)) +
-    geom_bar(stat="identity") +
-    labs(x="", y="Difference in probability based on GDP")
-p + coord_flip()
+## testing without outliers # check why is not working
+dmultinom(gdp.median[!names(gdp.median) %in% outliers],
+          prob=gdp.median$GDP.MEDIAN[!gdp.median$Country.Code %in% outliers])
 
 
 ## ***********************************************
-## Area by country
+## Webs versus research investment by country
 ## ***********************************************
 
+#check the result with LP
+dmultinom(res.inv.web.dat$Web.count, prob = res.inv.web.dat$ResInvestTotal)
+
+
+## ***********************************************
+## Webs versus area by country
+## ***********************************************
+
+#check the result with LP
+dmultinom(country.area.web.dat$Web.count, prob = country.area.web.dat$AREA)
+
+
+#since we have the whole data in one object don't we need this?
 studies.by.country.area  <-
-    studies.by.country[names(studies.by.country)
-                       %in% names(area.by.country)]
+    country.real.dat[names(country.real.dat)
+                       %in% names(area.richness$ISO3)]
 
 area.by.country.studies  <- area.by.country[names(area.by.country)
                              %in% names(studies.by.country.area)]
@@ -110,21 +82,9 @@ studies.by.country.area  <- studies.by.country.area [
 dmultinom(studies.by.country.area, prob=area.by.country.studies)
 
 ## ***********************************************
-## Bee diversity by country
+## Web versus bee diversity by country
 ## ***********************************************
 
-studies.by.country.div  <-
-    studies.by.country[names(studies.by.country)
-                       %in% names(bee.div.by.country)]
+dmultinom(country.area.web.dat$Web.count, prob = country.area.web.dat$CL_Species)
 
-div.by.country.studies  <-
-    bee.div.by.country[names(bee.div.by.country)
-                       %in% names(studies.by.country.div)]
 
-div.by.country.studies <- div.by.country.studies[
-    sort(names(div.by.country.studies))]
-
-studies.by.country.div  <- studies.by.country.div[
-    sort(names(studies.by.country.div ))]
-
-dmultinom(studies.by.country.div, prob=div.by.country.studies)
