@@ -2,6 +2,7 @@ rm(list=ls())
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
+## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
 
@@ -42,11 +43,11 @@ prop.area.s <- s.area.biome/globe.area.biome
 dmultinom(gdp.web.dat$Web.count, prob=gdp.web.dat$GDP.MEDIAN)
 
 ## remove China and the US
-outliers <- c("China", "United States")
+outliers <- c("CHN", "USA")
 
 ## testing without outliers # check why is not working
-dmultinom(gdp.median[!names(gdp.median) %in% outliers],
-          prob=gdp.median$GDP.MEDIAN[!gdp.median$Country.Code %in% outliers])
+dmultinom(gdp.web.dat$Web.count[!gdp.web.dat$Web.count %in% outliers],
+          prob=gdp.web.dat$GDP.MEDIAN[!gdp.web.dat$Country.Code %in% outliers])
 
 
 ## ***********************************************
@@ -87,4 +88,19 @@ dmultinom(studies.by.country.area, prob=area.by.country.studies)
 
 dmultinom(country.area.web.dat$Web.count, prob = country.area.web.dat$CL_Species)
 
+## ***********************************************
+## Multinomial multiplying probabilities
+## ***********************************************
+#GDP x Area x Species
+gdp.area.species <- merge(gdp.web.dat,
+                    country.area.web.dat,
+                    by.x = "Country.Code",
+                    by.y = "Country.Code",
+                    all = F)
+gdp.area.species <- gdp.area.species[,-4]
+colnames(gdp.area.species)[2] <- "Web.count"
+
+dmultinom(gdp.area.species$Web.count, prob = gdp.area.species$GDP.MEDIAN*
+                                              gdp.area.species$AREA*
+                                              gdp.area.species$CL_Species)
 
