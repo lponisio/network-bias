@@ -66,22 +66,6 @@ dmultinom(res.inv.web.dat$Web.count, prob = res.inv.web.dat$ResInvestTotal)
 dmultinom(country.area.web.dat$Web.count, prob = country.area.web.dat$AREA)
 
 
-#since we have the whole data in one object don't we need this?
-studies.by.country.area  <-
-    country.real.dat[names(country.real.dat)
-                       %in% names(area.richness$ISO3)]
-
-area.by.country.studies  <- area.by.country[names(area.by.country)
-                             %in% names(studies.by.country.area)]
-
-area.by.country.studies <- area.by.country.studies[
-    sort(names(area.by.country.studies))]
-
-studies.by.country.area  <- studies.by.country.area [
-    sort(names(studies.by.country.area ))]
-
-dmultinom(studies.by.country.area, prob=area.by.country.studies)
-
 ## ***********************************************
 ## Web versus bee diversity by country
 ## ***********************************************
@@ -94,13 +78,22 @@ dmultinom(country.area.web.dat$Web.count, prob = country.area.web.dat$CL_Species
 #GDP x Area x Species
 gdp.area.species <- merge(gdp.web.dat,
                     country.area.web.dat,
-                    by.x = "Country.Code",
-                    by.y = "Country.Code",
+                    by.x = c("Web.count", "Country.Code"),
+                    by.y = c("Web.count", "Country.Code"),
                     all = F)
-gdp.area.species <- gdp.area.species[,-4]
-colnames(gdp.area.species)[2] <- "Web.count"
 
+
+## area, gdp and species richness
 dmultinom(gdp.area.species$Web.count, prob = gdp.area.species$GDP.MEDIAN*
                                               gdp.area.species$AREA*
                                               gdp.area.species$CL_Species)
 
+
+## gdp and area
+dmultinom(gdp.area.species$Web.count, prob = gdp.area.species$GDP.MEDIAN*
+                                              gdp.area.species$AREA)
+
+
+## area and species richness
+dmultinom(gdp.area.species$Web.count, prob =  gdp.area.species$CL_Species*
+                                              gdp.area.species$AREA)
