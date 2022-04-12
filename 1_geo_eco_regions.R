@@ -4,8 +4,7 @@ library(rgdal)
 library(maptools)
 library(dplyr)
 
-## This script calculates the area for each biome globally and in the
-## N and S hemisphere
+#read data
 
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
