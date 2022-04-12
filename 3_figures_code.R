@@ -8,8 +8,25 @@ library(purrr)          # data manipulation
 library(cartogram)      # cartograms creation
 library(tmap)           # maps creation
 library(ggplot2)
+library(viridis)
+
+#read data
+setwd("~/Dropbox (University of Oregon)/")
+## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
+## setwd("\Dropbox (University of Oregon)")
+## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
+
+setwd("network-bias-saved")
+
+load(file="../network-bias/data/rawData.Rdata")
+load(file="../network-bias/data/biome_webs.Rdata")
 
 #graphs
+
+#proportions step 1
+#counting the proportions
+prop.area.n <- n.area.biome/globe.area.biome
+prop.area.s <- s.area.biome/globe.area.biome
 
 #check all proportions together
 for(i in 1:14){
@@ -22,7 +39,7 @@ for(i in 1:14){
      }
 
 
-## differences in probabilities
+## differences in probabilities for biomes area
 diffs <- as.data.frame((global.real.dat/sum(global.real.dat) -
          globe.area.biome/sum(globe.area.biome)))
 
@@ -37,10 +54,19 @@ p <- ggplot(data=diffs, aes(x=Biome.name, y=Freq)) +
      labs(x="", y="Difference in probability based on biome area")
 p + coord_flip()
 
+#making the graph prettier
 
-## differences in probabilities
-diffs <- as.data.frame(sort((country.real.dat/sum(country.real.dat) -
-                               gdp.median$GDP.MEDIAN/sum(gdp.2020$'X2020'))))
+p <- ggplot(data=diffs, aes(x=Biome.name, y=Freq)) +
+  geom_bar(stat="identity")+
+  labs(x="", y="Difference in probability based on biome area") +
+  theme_minimal()+
+  coord_flip()
+p
+
+
+## differences in probabilities for GDP median
+diffs.gdp <- as.data.frame(sort((country.real.dat/sum(country.real.dat) -
+                               gdp.median$GDP.MEDIAN/sum(gdp.median$GDP.MEDIAN))))
 
 ## plot
 p <- ggplot(data=diffs, aes(x=Var1, y=Freq)) +
