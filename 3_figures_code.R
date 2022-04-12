@@ -14,12 +14,12 @@ library(viridis)
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
-## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
+setwd("C:/Users/emanu/Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
 
 load(file="../network-bias/data/rawData.Rdata")
-load(file="../network-bias/data/biome_webs.Rdata")
+load(file="../network-bias-saved/saved/biome_webs.Rdata")
 
 #graphs
 
@@ -56,11 +56,13 @@ p + coord_flip()
 
 #making the graph prettier
 
-p <- ggplot(data=diffs, aes(x=Biome.name, y=Freq)) +
+p <- ggplot(data=diffs, aes(x=Biome.name, y=Freq, fill=Freq)) +
   geom_bar(stat="identity")+
   labs(x="", y="Difference in probability based on biome area") +
   theme_minimal()+
-  coord_flip()
+  scale_fill_viridis(option = "D")+
+  coord_flip() +
+  theme(legend.position="none")
 p
 
 
