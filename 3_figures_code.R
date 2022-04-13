@@ -20,6 +20,7 @@ setwd("network-bias-saved")
 
 load(file="../network-bias/data/rawData.Rdata")
 load(file="../network-bias-saved/saved/biome_webs.Rdata")
+load(file="../network-bias-saved/saved/GDP_web.Rdata")
 
 #graphs
 
@@ -67,8 +68,18 @@ p
 
 
 ## differences in probabilities for GDP median
-diffs.gdp <- as.data.frame(sort((country.real.dat/sum(country.real.dat) -
-                               gdp.median$GDP.MEDIAN/sum(gdp.median$GDP.MEDIAN))))
+country.real.dat <- as.data.frame(country.real.dat)
+webs.gdp <- merge(country.real.dat, gdp.web.dat,
+                  by.x = "Var1",
+                  by.y = "Country.Code",
+                  all = F)
+
+diffs.gdp <- as.data.frame(sort((webs.gdp$Web.count/sum(webs.gdp$Web.count) -
+                                   webs.gdp$GDP.MEDIAN/sum(webs.gdp$GDP.MEDIAN))))
+
+
+
+
 
 ## plot
 p <- ggplot(data=diffs, aes(x=Var1, y=Freq)) +
