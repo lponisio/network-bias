@@ -1,25 +1,29 @@
 rm(list=ls())
 library(tidyverse)
 
-## This script calculates the area for each biome globally and in the
-## N and S hemisphere
-
+#
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
-## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
+setwd("C:/Users/emanu/Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
 
-## nets <- read.csv("network_reuse.csv")
+#reading the data
+nets <- read.csv("network_reuse.csv", sep=";")
 
-## save(nets, file="network_reuse.Rdata")
+save(nets, file="network_reuse.Rdata")
 
 load(file="network_reuse.Rdata")
 
+#organizing the necessary data
 reused.web <- nets %>%
-    group_by(Web_Code, Web_Year, Country, Biome_WWF, Continent) %>%
+    group_by(Web_Code, Web_Year, Web_Decade, Data_Status="Reused", Country,
+             ISO3, Biome_WWF, Continent, Hemisphere) %>%
     summarise(ReusedCount = n())
+
+#checking the frequency of each network
+n_occur <- data.frame(table(nets$Web_Code))
 
 ## age of each original network
 reused.web$Age  <-  2022- reused.web$Web_Year
