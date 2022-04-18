@@ -460,7 +460,7 @@ biome.webs$BiomeName <- biome.code$BiomeName[match(
                                          biome.code$BIOME)]
 
 
-save(biome.webs, global.real.dat,
+save(biome.webs, global.real.dat, northern.real.dat,
      file="saved/biome_webs.Rdata")
 
 
