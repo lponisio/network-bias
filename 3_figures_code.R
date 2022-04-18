@@ -74,22 +74,21 @@ p <- ggplot(data=diffs, aes(x=Biome.name, y=Freq, fill=Freq)) +
   theme(legend.position="none")
 p
 
+tiff('prop_biomes.tif', w=6000, h=6000, units="px", res=600, compression = "lzw")
+p
+dev.off()
 ###########################
 ####GDP
 ###########################
 
 ## differences in probabilities for GDP median
-country.real.dat <- as.data.frame(country.real.dat)
-webs.gdp <- merge(country.real.dat, gdp.web.dat,
-                  by.x = "Var1",
-                  by.y = "Country.Code",
-                  all = F)
+gdp.web.dat <- gdp.web.dat[gdp.web.dat$Web.count > 1,]
 
-diffs.gdp <- as.data.frame((webs.gdp$Web.count/sum(webs.gdp$Web.count) -
-                                   webs.gdp$GDP.MEDIAN/sum(webs.gdp$GDP.MEDIAN)))
+diffs.gdp <- as.data.frame((gdp.web.dat$Web.count/sum(gdp.web.dat$Web.count) -
+                              gdp.web.dat$GDP.MEDIAN/sum(gdp.web.dat$GDP.MEDIAN)))
 
-diffs.gdp$Country <- webs.gdp$Var1
-diffs.gdp$Freq <- diffs.gdp$`(webs.gdp$Web.count/sum(webs.gdp$Web.count) - webs.gdp$GDP.MEDIAN/sum(webs.gdp$GDP.MEDIAN))`
+diffs.gdp$Country <- gdp.web.dat$Country.Code
+diffs.gdp$Freq <- diffs.gdp$`(gdp.web.dat$Web.count/sum(gdp.web.dat$Web.count) - gdp.web.dat$GDP.MEDIAN/sum(gdp.web.dat$GDP.MEDIAN))`
 diffs.gdp <- diffs.gdp[order(diffs.gdp$Freq),]
 diffs.gdp <- diffs.gdp[,-1]
 
@@ -111,6 +110,10 @@ p <- ggplot(data=diffs.gdp, aes(x=Country, y=Freq, fill=Freq)) +
   coord_flip() +
   theme(legend.position="none")
 p
+
+tiff('prop_gdp.tif', w=6000, h=6000, units="px", res=600, compression = "lzw")
+p
+dev.off()
 
 ###########################
 ####Research Investment
@@ -139,6 +142,10 @@ p <- ggplot(data=diffs.ri, aes(x=Country, y=Freq, fill=Freq)) +
   theme(legend.position="none")
 p
 
+tiff('prop_res_inv.tif', w=6000, h=6000, units="px", res=600, compression = "lzw")
+p
+dev.off()
+
 ###########################
 ####Bees diversity
 ###########################
@@ -166,7 +173,9 @@ p <- ggplot(data=diffs.bees, aes(x=Country, y=Freq, fill=Freq)) +
   theme(legend.position="none")
 p
 
-
+tiff('prop_bees.tif', w=6000, h=6000, units="px", res=600, compression = "lzw")
+p
+dev.off()
 
 
 #
