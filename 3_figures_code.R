@@ -21,6 +21,8 @@ setwd("network-bias-saved")
 load(file="../network-bias/data/rawData.Rdata")
 load(file="../network-bias-saved/saved/biome_webs.Rdata")
 load(file="../network-bias-saved/saved/GDP_web.Rdata")
+load(file="../network-bias-saved/saved/res_inv_web.Rdata")
+load(file="../network-bias-saved/saved/area_richness_web.Rdata")
 
 #graphs
 
@@ -40,6 +42,10 @@ for(i in 1:14){
      }
 
 
+###########################
+####Biomes
+###########################
+
 ## differences in probabilities for biomes area
 diffs <- as.data.frame((global.real.dat/sum(global.real.dat) -
          globe.area.biome/sum(globe.area.biome)))
@@ -57,6 +63,8 @@ p + coord_flip()
 
 #making the graph prettier
 
+diffs$Biome.name <- factor(diffs$Biome.name, levels = diffs$Biome.name[order(diffs$Freq)])
+
 p <- ggplot(data=diffs, aes(x=Biome.name, y=Freq, fill=Freq)) +
   geom_bar(stat="identity")+
   labs(x="", y="Difference in probability based on biome area") +
@@ -66,6 +74,9 @@ p <- ggplot(data=diffs, aes(x=Biome.name, y=Freq, fill=Freq)) +
   theme(legend.position="none")
 p
 
+###########################
+####GDP
+###########################
 
 ## differences in probabilities for GDP median
 country.real.dat <- as.data.frame(country.real.dat)
@@ -74,18 +85,86 @@ webs.gdp <- merge(country.real.dat, gdp.web.dat,
                   by.y = "Country.Code",
                   all = F)
 
-diffs.gdp <- as.data.frame(sort((webs.gdp$Web.count/sum(webs.gdp$Web.count) -
-                                   webs.gdp$GDP.MEDIAN/sum(webs.gdp$GDP.MEDIAN))))
+diffs.gdp <- as.data.frame((webs.gdp$Web.count/sum(webs.gdp$Web.count) -
+                                   webs.gdp$GDP.MEDIAN/sum(webs.gdp$GDP.MEDIAN)))
 
-
-
-
+diffs.gdp$Country <- webs.gdp$Var1
+diffs.gdp$Freq <- diffs.gdp$`(webs.gdp$Web.count/sum(webs.gdp$Web.count) - webs.gdp$GDP.MEDIAN/sum(webs.gdp$GDP.MEDIAN))`
+diffs.gdp <- diffs.gdp[order(diffs.gdp$Freq),]
+diffs.gdp <- diffs.gdp[,-1]
 
 ## plot
-p <- ggplot(data=diffs, aes(x=Var1, y=Freq)) +
+p <- ggplot(data=diffs.gdp, aes(x=Country, y=Freq)) +
   geom_bar(stat="identity") +
   labs(x="", y="Difference in probability based on GDP")
 p + coord_flip()
+
+#making the graph prettier
+
+diffs.gdp$Country <- factor(diffs.gdp$Country, levels = diffs.gdp$Country[order(diffs.gdp$Freq)])
+
+p <- ggplot(data=diffs.gdp, aes(x=Country, y=Freq, fill=Freq)) +
+  geom_bar(stat="identity")+
+  labs(x="", y="Difference in probability based on GDP") +
+  theme_minimal()+
+  scale_fill_viridis(option = "D")+
+  coord_flip() +
+  theme(legend.position="none")
+p
+
+###########################
+####Research Investment
+###########################
+
+## differences in probabilities for research investment
+res.inv.web.dat <- res.inv.web.dat[res.inv.web.dat$Web.count > 1,]
+diffs.ri <- as.data.frame((res.inv.web.dat$Web.count/sum(res.inv.web.dat$Web.count) -
+                          res.inv.web.dat$ResInvestTotal/sum(res.inv.web.dat$ResInvestTotal)))
+
+diffs.ri$Country <- res.inv.web.dat$Country.Code
+diffs.ri$Freq <- diffs.ri$`(res.inv.web.dat$Web.count/sum(res.inv.web.dat$Web.count) - res.inv.web.dat$ResInvestTotal/sum(res.inv.web.dat$ResInvestTotal))`
+diffs.ri <- diffs.ri[order(diffs.ri$Freq),]
+diffs.ri <- diffs.ri[,-1]
+
+#making the graph prettier
+
+diffs.ri$Country <- factor(diffs.ri$Country, levels = diffs.ri$Country[order(diffs.ri$Freq)])
+
+p <- ggplot(data=diffs.ri, aes(x=Country, y=Freq, fill=Freq)) +
+  geom_bar(stat="identity")+
+  labs(x="", y="Difference in probability based on Research investment") +
+  theme_minimal()+
+  scale_fill_viridis(option = "D")+
+  coord_flip() +
+  theme(legend.position="none")
+p
+
+###########################
+####Bees diversity
+###########################
+
+## differences in probabilities for research investment
+country.area.web.dat <- country.area.web.dat[country.area.web.dat$Web.count > 1,]
+diffs.bees <- as.data.frame((country.area.web.dat$Web.count/sum(country.area.web.dat$Web.count) -
+                             country.area.web.dat$CL_Species/sum(country.area.web.dat$CL_Species)))
+
+diffs.bees$Country <- country.area.web.dat$Country.Code
+diffs.bees$Freq <- diffs.bees$`(country.area.web.dat$Web.count/sum(country.area.web.dat$Web.count) - country.area.web.dat$CL_Species/sum(country.area.web.dat$CL_Species))`
+diffs.bees <- diffs.bees[order(diffs.bees$Freq),]
+diffs.bees <- diffs.bees[,-1]
+
+#making the graph prettier
+
+diffs.bees$Country <- factor(diffs.bees$Country, levels = diffs.bees$Country[order(diffs.bees$Freq)])
+
+p <- ggplot(data=diffs.bees, aes(x=Country, y=Freq, fill=Freq)) +
+  geom_bar(stat="identity")+
+  labs(x="", y="Difference in probability based on Bees' diversity") +
+  theme_minimal()+
+  scale_fill_viridis(option = "D")+
+  coord_flip() +
+  theme(legend.position="none")
+p
 
 
 
