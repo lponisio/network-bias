@@ -26,6 +26,23 @@ load(file="../network-bias-saved/saved/area_richness_web.Rdata")
 
 #graphs
 
+#box plot for networks' latitude
+#violin plot
+p <- ggplot(webs, aes(x = "", y=LAT)) +
+  geom_violin(trim=FALSE, fill="gray") +
+  labs(x=NULL, y = "Latitude") +
+  geom_boxplot(width=0.1)+
+  scale_y_continuous(breaks = seq(-50, 100, by = 25)) +
+  #geom_jitter(shape=16, position=position_jitter(0.2)) +
+  scale_color_grey() +
+  theme_classic()
+p
+
+tiff('nets_lat.tif', w=3000, h=6000, units="px", res=600, compression = "lzw")
+p
+dev.off()
+
+
 #proportions step 1
 #counting the proportions
 prop.area.n <- n.area.biome/globe.area.biome
@@ -71,10 +88,12 @@ p <- ggplot(data=diffs, aes(x=Biome.name, y=Freq, fill=Freq)) +
   theme_minimal()+
   scale_fill_viridis(option = "D")+
   coord_flip() +
-  theme(legend.position="none")
+  theme(legend.position="none",
+        axis.text = element_text(size = 18),
+        axis.title.x = element_text(size = 16))
 p
 
-tiff('prop_biomes.tif', w=6000, h=6000, units="px", res=600, compression = "lzw")
+tiff('prop_biomes.tif', w=9500, h=6000, units="px", res=600, compression = "lzw")
 p
 dev.off()
 ###########################
@@ -106,9 +125,11 @@ p <- ggplot(data=diffs.gdp, aes(x=Country, y=Freq, fill=Freq)) +
   geom_bar(stat="identity")+
   labs(x="", y="Difference in probability based on GDP") +
   theme_minimal()+
-  scale_fill_viridis(option = "D")+
+  scale_fill_viridis(option = "D", direction = -1)+
   coord_flip() +
-  theme(legend.position="none")
+  theme(legend.position="none",
+        axis.text = element_text(size = 18),
+        axis.title.x = element_text(size = 16))
 p
 
 tiff('prop_gdp.tif', w=6000, h=6000, units="px", res=600, compression = "lzw")
@@ -137,9 +158,11 @@ p <- ggplot(data=diffs.ri, aes(x=Country, y=Freq, fill=Freq)) +
   geom_bar(stat="identity")+
   labs(x="", y="Difference in probability based on Research investment") +
   theme_minimal()+
-  scale_fill_viridis(option = "D")+
+  scale_fill_viridis(option = "D", direction = -1)+
   coord_flip() +
-  theme(legend.position="none")
+  theme(legend.position="none",
+        axis.text = element_text(size = 18),
+        axis.title.x = element_text(size = 16))
 p
 
 tiff('prop_res_inv.tif', w=6000, h=6000, units="px", res=600, compression = "lzw")
@@ -150,7 +173,7 @@ dev.off()
 ####Bees diversity
 ###########################
 
-## differences in probabilities for research investment
+## differences in probabilities for bees species
 country.area.web.dat <- country.area.web.dat[country.area.web.dat$Web.count > 1,]
 diffs.bees <- as.data.frame((country.area.web.dat$Web.count/sum(country.area.web.dat$Web.count) -
                              country.area.web.dat$CL_Species/sum(country.area.web.dat$CL_Species)))
@@ -168,9 +191,11 @@ p <- ggplot(data=diffs.bees, aes(x=Country, y=Freq, fill=Freq)) +
   geom_bar(stat="identity")+
   labs(x="", y="Difference in probability based on Bees' diversity") +
   theme_minimal()+
-  scale_fill_viridis(option = "D")+
+  scale_fill_viridis(option = "D", direction = -1)+
   coord_flip() +
-  theme(legend.position="none")
+  theme(legend.position="none",
+        axis.text = element_text(size = 18),
+        axis.title.x = element_text(size = 16))
 p
 
 tiff('prop_bees.tif', w=6000, h=6000, units="px", res=600, compression = "lzw")
@@ -178,6 +203,8 @@ p
 dev.off()
 
 
+#
+# DISTORTED MAPS
 #
 world_map = ne_countries(returnclass = "sf")
 
