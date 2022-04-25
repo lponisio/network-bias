@@ -2,7 +2,7 @@ rm(list=ls())
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
-## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
+setwd("C:/Users/emanu/Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
 
