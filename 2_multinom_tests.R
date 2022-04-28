@@ -2,7 +2,7 @@ rm(list=ls())
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
-setwd("C:/Users/emanu/Dropbox (University of Oregon)")
+## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
 
@@ -15,18 +15,25 @@ load('saved/res_inv_web.Rdata')
 ## ***********************************************
 ## AREA by biome
 ## ***********************************************
+
 ## likelihood tests
-dmultinom(biome.webs$GlobalWebs, prob=biome.webs$GlobalArea)
-dmultinom(biome.webs$NorthernWebs, prob=biome.webs$NorthernArea)
-dmultinom(biome.webs$SouthernWebs[!is.na(biome.webs$SouthernArea)],
+multinomial.test(observed= c(biome.webs$GlobalWebs),
+                 prob=biome.webs$GlobalArea/sum(biome.webs$GlobalArea),
+                 MonteCarlo = TRUE, ntrial=10^7)
+
+
+multinomial.test(biome.webs$NorthernWebs,
+                 prob=biome.webs$NorthernArea)
+
+multinomial.test(biome.webs$SouthernWebs[!is.na(biome.webs$SouthernArea)],
           prob=biome.webs$SouthernArea[!is.na(biome.webs$SouthernArea)])
 
 ## likelihood tests without tundra
-dmultinom(biome.webs$GlobalWebs[biome.webs$BiomeName != "TUNDRA"],
+multinomial.test(biome.webs$GlobalWebs[biome.webs$BiomeName != "TUNDRA"],
           prob=biome.webs$GlobalArea[biome.webs$BiomeName != "TUNDRA"])
-dmultinom(biome.webs$NorthernWebs[biome.webs$BiomeName != "TUNDRA"],
+multinomial.test(biome.webs$NorthernWebs[biome.webs$BiomeName != "TUNDRA"],
           prob=biome.webs$NorthernArea[biome.webs$BiomeName != "TUNDRA"])
-dmultinom(biome.webs$SouthernWebs[!is.na(biome.webs$SouthernArea) &
+multinomial.test(biome.webs$SouthernWebs[!is.na(biome.webs$SouthernArea) &
                                   biome.webs$BiomeName != "TUNDRA"],
           prob=biome.webs$SouthernArea[!is.na(biome.webs$SouthernArea) &
                                        biome.webs$BiomeName != "TUNDRA"])
@@ -40,13 +47,15 @@ prop.area.s <- s.area.biome/globe.area.biome
 ## GDP by country
 ## ***********************************************
 
-dmultinom(gdp.web.dat$Web.count, prob=gdp.web.dat$GDP.MEDIAN)
+multinomial.test(gdp.web.dat$Web.count,
+                 prob=log(gdp.web.dat$GDP.MEDIAN)/sum(log(gdp.web.dat$GDP.MEDIAN)),
+                 MonteCarlo = TRUE, ntrial=10^7)
 
 ## remove China and the US
 outliers <- c("CHN", "USA")
 
 ## testing without outliers # check why is not working
-dmultinom(gdp.web.dat$Web.count[!gdp.web.dat$Web.count %in% outliers],
+multinomial.test(gdp.web.dat$Web.count[!gdp.web.dat$Web.count %in% outliers],
           prob=gdp.web.dat$GDP.MEDIAN[!gdp.web.dat$Country.Code %in% outliers])
 
 
@@ -55,7 +64,7 @@ dmultinom(gdp.web.dat$Web.count[!gdp.web.dat$Web.count %in% outliers],
 ## ***********************************************
 
 #check the result with LP
-dmultinom(res.inv.web.dat$Web.count, prob = res.inv.web.dat$ResInvestTotal)
+multinomial.test(res.inv.web.dat$Web.count, prob = res.inv.web.dat$ResInvestTotal)
 
 
 ## ***********************************************
@@ -63,14 +72,14 @@ dmultinom(res.inv.web.dat$Web.count, prob = res.inv.web.dat$ResInvestTotal)
 ## ***********************************************
 
 #check the result with LP
-dmultinom(country.area.web.dat$Web.count, prob = country.area.web.dat$AREA)
+multinomial.test(country.area.web.dat$Web.count, prob = country.area.web.dat$AREA)
 
 
 ## ***********************************************
 ## Web versus bee diversity by country
 ## ***********************************************
 
-dmultinom(country.area.web.dat$Web.count, prob = country.area.web.dat$CL_Species)
+multinomial.test(country.area.web.dat$Web.count, prob = country.area.web.dat$CL_Species)
 
 ## ***********************************************
 ## Multinomial multiplying probabilities
@@ -84,16 +93,16 @@ gdp.area.species <- merge(gdp.web.dat,
 
 
 ## area, gdp and species richness
-dmultinom(gdp.area.species$Web.count, prob = gdp.area.species$GDP.MEDIAN*
+multinomial.test(gdp.area.species$Web.count, prob = gdp.area.species$GDP.MEDIAN*
                                               gdp.area.species$AREA*
                                               gdp.area.species$CL_Species)
 
 
 ## gdp and area
-dmultinom(gdp.area.species$Web.count, prob = gdp.area.species$GDP.MEDIAN*
+multinomial.test(gdp.area.species$Web.count, prob = gdp.area.species$GDP.MEDIAN*
                                               gdp.area.species$AREA)
 
 
 ## area and species richness
-dmultinom(gdp.area.species$Web.count, prob =  gdp.area.species$CL_Species*
+multinomial.test(gdp.area.species$Web.count, prob =  gdp.area.species$CL_Species*
                                               gdp.area.species$AREA)
