@@ -22,6 +22,9 @@ library(MASS)
 ## ***********************************************
 
 ## global
+# need change variable type
+biome.webs$GlobalWebs <- as.numeric(biome.webs$GlobalWebs)
+
 biome.area.mod <- glm(GlobalWebs ~ log(GlobalArea),
                       data=biome.webs, family="poisson")
 
@@ -29,7 +32,8 @@ summary(biome.area.mod)
 
 r.squaredGLMM(biome.area.mod)
 
-performance::check_model(biome.area.mod)
+check_model(biome.area.mod)
+check_normality(biome.area.mod)
 
 
 ## N hemiphere
@@ -37,6 +41,8 @@ biome.area.mod.N <- glm(NorthernWebs ~ log(GlobalArea),
                       data=biome.webs, family="poisson")
 
 summary(biome.area.mod.N)
+check_model(biome.area.mod.N)
+plot(biome.area.mod.N)
 
 
 ## S hemisphere
@@ -60,7 +66,6 @@ gdp.area.species <- merge(gdp.area.species,
                           res.inv.web.dat,
                           by=c("Web.count", "Country.Code"))
 
-
 all.country.mod <- glm.nb(Web.count ~
                               log(GDP.MEDIAN) +
                               log(AREA) + log(CL_Species),
@@ -68,7 +73,8 @@ all.country.mod <- glm.nb(Web.count ~
                           data=gdp.area.species)
 
 summary(all.country.mod)
-
+check_model(all.country.mod)
+plot(all.country.mod)
 
 plot(log(gdp.area.species$GDP.MEDIAN) ~
          log(gdp.area.species$ResInvestTotal))
