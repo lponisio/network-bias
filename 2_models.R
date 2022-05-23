@@ -6,12 +6,14 @@ setwd("~/Dropbox (University of Oregon)/")
 
 setwd("network-bias-saved")
 
-## biome.webs
+## dataset
 load('saved/area_richness_web.Rdata')
 load('saved/biome_webs.Rdata')
 load('saved/GDP_web.Rdata')
 load('saved/res_inv_web.Rdata')
+load('saved/webs_raw.Rdata')
 
+#packages
 library(performance)
 library(lme4)
 library(MuMIn)
@@ -33,7 +35,6 @@ summary(biome.area.mod)
 r.squaredGLMM(biome.area.mod)
 
 check_model(biome.area.mod)
-check_normality(biome.area.mod)
 
 
 ## N hemiphere
@@ -85,3 +86,4 @@ vif(all.country.mod)
 outliers <- c("CHN", "USA")
 
 
+#

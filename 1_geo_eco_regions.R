@@ -162,6 +162,8 @@ gdp.web.dat  <- merge(gdp.web.dat,
 
 head(gdp.web.dat)
 
+save(webs,
+     file="saved/webs_raw.Rdata")
 save(gdp.web.dat,
      file="saved/GDP_web.Rdata")
 
