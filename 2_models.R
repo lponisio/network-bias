@@ -2,9 +2,13 @@ rm(list=ls())
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
-## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
+setwd("C:/Users/emanu/Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
+
+data <- read.csv("gdp_area_species", sep = ";")
+save(webs,
+     file="saved/webs_raw.Rdata")
 
 ## dataset
 load('saved/area_richness_web.Rdata')
@@ -18,6 +22,7 @@ library(performance)
 library(lme4)
 library(MuMIn)
 library(MASS)
+library(car)
 
 ## ***********************************************
 ## AREA by biome
@@ -37,8 +42,9 @@ r.squaredGLMM(biome.area.mod)
 check_model(biome.area.mod)
 
 
+
 ## N hemiphere
-biome.area.mod.N <- glm(NorthernWebs ~ log(GlobalArea),
+biome.area.mod.N <- glm(NorthernWebs ~ log(NorthernArea),
                       data=biome.webs, family="poisson")
 
 summary(biome.area.mod.N)
@@ -47,7 +53,7 @@ plot(biome.area.mod.N)
 
 
 ## S hemisphere
-biome.area.mod.S <- glm(SouthernWebs ~ log(GlobalArea),
+biome.area.mod.S <- glm(SouthernWebs ~ log(SouthernArea),
                       data=biome.webs, family="poisson")
 
 summary(biome.area.mod.S)
@@ -61,17 +67,39 @@ gdp.area.species <- merge(gdp.web.dat,
                     country.area.web.dat,
                     by.x = c("Web.count", "Country.Code"),
                     by.y = c("Web.count", "Country.Code"),
-                    all = F)
+                    all = T)
 
 gdp.area.species <- merge(gdp.area.species,
                           res.inv.web.dat,
-                          by=c("Web.count", "Country.Code"))
+                          by.x = c("Web.count", "Country.Code"),
+                          by.y = c("Web.count", "Country.Code"),
+                          all = T)
+
+
+write.csv(gdp.area.species, file="gdp_area_species.csv",
+          row.names=FALSE)
+
+gdp.area.species.2 <- merge(x = gdp.area.species,
+                            y = webs[ , c("Country.Code", "Continent")],
+                            by = "Country.Code", all.x=T)
+
 
 all.country.mod <- glm.nb(Web.count ~
                               log(GDP.MEDIAN) +
                               log(AREA) + log(CL_Species),
                               ## log(ResInvestTotal),
                           data=gdp.area.species)
+
+all.country.mod <- glmer(Web.count ~
+                              log(GDP.MEDIAN) +
+                              #log(ResInvestTotal)+
+                              log(AREA) +
+                              log(CL_Species) +
+                              (1|Country.Code),
+                              #(1 + GDP.MEDIAN|Country.Code) +
+                              #(1 + CL_Species|Country.Code),
+                            ## log(ResInvestTotal),
+                            data=gdp.area.species, family = "poisson")
 
 summary(all.country.mod)
 check_model(all.country.mod)
