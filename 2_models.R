@@ -6,16 +6,13 @@ setwd("C:/Users/emanu/Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
 
-data <- read.csv("gdp_area_species", sep = ";")
-save(webs,
-     file="saved/webs_raw.Rdata")
-
 ## dataset
 load('saved/area_richness_web.Rdata')
 load('saved/biome_webs.Rdata')
 load('saved/GDP_web.Rdata')
 load('saved/res_inv_web.Rdata')
 load('saved/webs_raw.Rdata')
+load('saved/webs_all_data')
 
 #packages
 library(performance)
