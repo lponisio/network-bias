@@ -12,7 +12,7 @@ load('saved/biome_webs.Rdata')
 load('saved/GDP_web.Rdata')
 load('saved/res_inv_web.Rdata')
 load('saved/webs_raw.Rdata')
-load('saved/webs_all_data')
+load('saved/webs_all_data.Rdata')
 
 #packages
 library(performance)
@@ -111,4 +111,14 @@ vif(all.country.mod)
 outliers <- c("CHN", "USA")
 
 
-#
+# New models by EB
+country.mod <- glmer(Web.count ~
+                       log(ResInvestTotal)+
+                       log(AREA) +
+                       log(CL_Species) +
+                       (1|Country.Code)+
+                       (1|Hemisphere),
+                       data=gdp_area_species, family = "poisson")
+
+summary(country.mod)
+plot(country.mod)
