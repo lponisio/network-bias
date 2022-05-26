@@ -2,7 +2,7 @@ rm(list=ls())
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
-setwd("C:/Users/emanu/Dropbox (University of Oregon)")
+## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
 
@@ -17,9 +17,11 @@ load('saved/webs_all_data.Rdata')
 #packages
 library(performance)
 library(lme4)
+library(nlme)
 library(MuMIn)
 library(MASS)
 library(car)
+library(ggplot2)
 
 ## ***********************************************
 ## AREA by biome
@@ -112,13 +114,38 @@ outliers <- c("CHN", "USA")
 
 
 # New models by EB
+gdp_area_species <- na.omit(gdp_area_species)
+
+country.null <- glmer(Web.count ~ 1 + (1|Continent),
+                      data=gdp_area_species, family = "poisson")
 country.mod <- glmer(Web.count ~
                        log(ResInvestTotal)+
-                       log(AREA) +
-                       log(CL_Species) +
-                       (1|Country.Code)+
-                       (1|Hemisphere),
+                       log(AREA)+
+                       log(CL_Species)+
+                       Continent +
+                       (1|Continent),
                        data=gdp_area_species, family = "poisson")
 
 summary(country.mod)
-plot(country.mod)
+
+anova(country.null, country.mod)
+
+library(ggeffects)
+library(sjPlot)
+
+plot_model(country.mod, type = "pred", terms = c("Continent"), pred.type = "re")
+plot_model(country.mod)
+tab_model(country.mod)
+
+pr <- ggpredict(country.mod, c("Continent"))
+plot(pr)
+
+
+ggplot(gdp_area_species, aes(x = AREA, y = Web.count, color = Continent) ) +
+  geom_point() +
+  geom_smooth(method = "lm", se = F)
+
+ggplot(gdp_area_species, aes(x = ResInvestTotal, y = Web.count, color = Hemisphere) ) +
+  geom_point() +
+  geom_smooth(method = "lm", se = F)
+
