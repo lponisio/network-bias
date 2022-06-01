@@ -13,6 +13,7 @@ load('saved/GDP_web.Rdata')
 load('saved/res_inv_web.Rdata')
 load('saved/webs_raw.Rdata')
 load('saved/webs_all_data.Rdata')
+load('saved/biomes_data.Rdata')
 
 #packages
 library(performance)
@@ -21,7 +22,9 @@ library(nlme)
 library(MuMIn)
 library(MASS)
 library(car)
+library(sjPlot)
 library(ggplot2)
+library(ggeffects)
 
 ## ***********************************************
 ## AREA by biome
@@ -32,7 +35,12 @@ library(ggplot2)
 biome.webs$GlobalWebs <- as.numeric(biome.webs$GlobalWebs)
 
 biome.area.mod <- glm(GlobalWebs ~ log(GlobalArea),
-                      data=biome.webs, family="poisson")
+                      data=biome.webs, family = "poisson")
+plot(biome.area.mod)
+summary(biome.area.mod)
+
+ggplot(biome.webs, aes(x = GlobalArea, y = GlobalWebs)) +
+  geom_point()
 
 summary(biome.area.mod)
 
@@ -57,95 +65,68 @@ biome.area.mod.S <- glm(SouthernWebs ~ log(SouthernArea),
 
 summary(biome.area.mod.S)
 
+#grouping a model with all biome data
+
+biome.net.m1 <- glm(Webs ~ log(Area), data = biomes_web_data[1:28,], family = "poisson")
+summary(biome.net.m1)
+plot(biome.net.m2)
+
+biome.net.m2 <- glm(Webs ~ log(Area) + Hemisphere, data = biomes_web_data[1:28,],
+                  family = "poisson")
+summary(biome.net.m2)
+plot(biome.net.m2)
+
+
+ggplot(biomes_web_data[1:28,], aes(x = log(Area), y = Webs, color = Hemisphere) ) +
+  geom_point() +
+  geom_smooth(method = "glm", se = T)
+
+
 ## ***********************************************
-## GDP by country
+## GLMM Models
 ## ***********************************************
 
 #GDP x Area x Species
-gdp.area.species <- merge(gdp.web.dat,
-                    country.area.web.dat,
-                    by.x = c("Web.count", "Country.Code"),
-                    by.y = c("Web.count", "Country.Code"),
-                    all = T)
-
-gdp.area.species <- merge(gdp.area.species,
-                          res.inv.web.dat,
-                          by.x = c("Web.count", "Country.Code"),
-                          by.y = c("Web.count", "Country.Code"),
-                          all = T)
-
-
-write.csv(gdp.area.species, file="gdp_area_species.csv",
-          row.names=FALSE)
-
-gdp.area.species.2 <- merge(x = gdp.area.species,
-                            y = webs[ , c("Country.Code", "Continent")],
-                            by = "Country.Code", all.x=T)
-
-
-all.country.mod <- glm.nb(Web.count ~
-                              log(GDP.MEDIAN) +
-                              log(AREA) + log(CL_Species),
-                              ## log(ResInvestTotal),
-                          data=gdp.area.species)
-
-all.country.mod <- glmer(Web.count ~
-                              log(GDP.MEDIAN) +
-                              #log(ResInvestTotal)+
-                              log(AREA) +
-                              log(CL_Species) +
-                              (1|Country.Code),
-                              #(1 + GDP.MEDIAN|Country.Code) +
-                              #(1 + CL_Species|Country.Code),
-                            ## log(ResInvestTotal),
-                            data=gdp.area.species, family = "poisson")
-
-summary(all.country.mod)
-check_model(all.country.mod)
-plot(all.country.mod)
-
-plot(log(gdp.area.species$GDP.MEDIAN) ~
-         log(gdp.area.species$ResInvestTotal))
-
-vif(all.country.mod)
-
-## remove China and the US
-outliers <- c("CHN", "USA")
-
-
-# New models by EB
 gdp_area_species <- na.omit(gdp_area_species)
 
-country.null <- glmer(Web.count ~ 1 + (1|Continent),
-                      data=gdp_area_species, family = "poisson")
 country.mod <- glmer(Web.count ~
                        log(ResInvestTotal)+
                        log(AREA)+
                        log(CL_Species)+
-                       Continent +
+                       (1|Hemisphere)+
                        (1|Continent),
                        data=gdp_area_species, family = "poisson")
 
 summary(country.mod)
 
-anova(country.null, country.mod)
+r.squaredGLMM(country.mod)
 
-library(ggeffects)
-library(sjPlot)
-
-plot_model(country.mod, type = "pred", terms = c("Continent"), pred.type = "re")
 plot_model(country.mod)
 tab_model(country.mod)
 
-pr <- ggpredict(country.mod, c("Continent"))
+pr <- ggpredict(country.mod, c("Continent", "Hemisphere"))
 plot(pr)
 
 
 ggplot(gdp_area_species, aes(x = AREA, y = Web.count, color = Continent) ) +
   geom_point() +
-  geom_smooth(method = "lm", se = F)
+  geom_smooth(method = "lm", se = T)
 
 ggplot(gdp_area_species, aes(x = ResInvestTotal, y = Web.count, color = Hemisphere) ) +
   geom_point() +
   geom_smooth(method = "lm", se = F)
+
+gdp_area_species$fit <- predict(country.mod)
+
+ggplot(gdp_area_species, aes(x = log(AREA), y = Web.count, color = Continent)) +
+  geom_line(aes(y=fit, lty=Continent), size=0.8) +
+  geom_point(alpha = 0.3) +
+  geom_hline(yintercept=0, linetype="dashed") +
+  theme_bw()
+
+
+
+ggplot(gdp_area_species, aes(log(AREA), Web.count, col = Continent)) +
+  geom_point() +
+  geom_line(aes(y = fit), size = 1)
 
