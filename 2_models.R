@@ -69,7 +69,7 @@ summary(biome.area.mod.S)
 
 biome.net.m1 <- glm(Webs ~ log(Area), data = biomes_web_data[1:28,], family = "poisson")
 summary(biome.net.m1)
-plot(biome.net.m2)
+plot(biome.net.m1)
 
 biome.net.m2 <- glm(Webs ~ log(Area) + Hemisphere, data = biomes_web_data[1:28,],
                   family = "poisson")
@@ -77,6 +77,7 @@ summary(biome.net.m2)
 plot(biome.net.m2)
 
 
+#graph
 ggplot(biomes_web_data[1:28,], aes(x = log(Area), y = Webs, color = Hemisphere) ) +
   geom_point() +
   geom_smooth(method = "glm", se = T)
@@ -108,11 +109,16 @@ pr <- ggpredict(country.mod, c("Continent", "Hemisphere"))
 plot(pr)
 
 
+#graph
 ggplot(gdp_area_species, aes(x = AREA, y = Web.count, color = Continent) ) +
   geom_point() +
   geom_smooth(method = "lm", se = T)
 
 ggplot(gdp_area_species, aes(x = ResInvestTotal, y = Web.count, color = Hemisphere) ) +
+  geom_point() +
+  geom_smooth(method = "lm", se = F)
+
+ggplot(gdp_area_species, aes(x = CL_Species, y = Web.count, color = Hemisphere) ) +
   geom_point() +
   geom_smooth(method = "lm", se = F)
 
@@ -123,8 +129,6 @@ ggplot(gdp_area_species, aes(x = log(AREA), y = Web.count, color = Continent)) +
   geom_point(alpha = 0.3) +
   geom_hline(yintercept=0, linetype="dashed") +
   theme_bw()
-
-
 
 ggplot(gdp_area_species, aes(log(AREA), Web.count, col = Continent)) +
   geom_point() +
