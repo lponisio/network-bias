@@ -2,7 +2,7 @@ rm(list=ls())
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
-setwd("C:/Users/emanu/Dropbox (University of Oregon)")
+## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
 
@@ -25,6 +25,7 @@ library(car)
 library(sjPlot)
 library(ggplot2)
 library(ggeffects)
+library(viridis)
 
 ## ***********************************************
 ## AREA by biome
@@ -80,12 +81,19 @@ summary(biome.net.m2)
 plot(biome.net.m2)
 
 #graph
-ggplot(biomes_web_data[biomes_web_data$Hemisphere!='Global',], aes(x = log(Area), y = Webs, color = Hemisphere) ) +
-  geom_point() +
-  geom_smooth(method = "glm", se = T,
-              method.args = list(family = "poisson"))
-
 biomes_web_data$logArea <- log(biomes_web_data$Area)
+biomes_web_data <- biomes_web_data[biomes_web_data$logArea > 8,]
+biomes_web_data <- na.omit(biomes_web_data)
+
+ggplot(biomes_web_data[biomes_web_data$Hemisphere!='Global',],
+       aes(x = logArea, y = Webs, color = Hemisphere)) +
+  geom_point() +
+  scale_color_viridis(discrete = T) +
+  geom_smooth(method = "glm", se = T,
+              method.args = list(family = "poisson")) +
+  labs(x="Area per biome (log)", y="Networks") +
+  theme_classic()
+
 
 ## ***********************************************
 ## GLMM Models
@@ -105,6 +113,7 @@ summary(country.mod)
 vif(country.mod)
 r.squaredGLMM(country.mod)
 
+#Bayesian model, but takes a long time
 library(brms)
 
 country.mod <- brm(bf(Web.count ~
@@ -126,13 +135,33 @@ plot(pr)
 
 
 #graph
+#area per country
 ggplot(gdp_area_species, aes(x = AREA, y = Web.count, color = Continent) ) +
   geom_point() +
   geom_smooth(method = "lm", se = T)
 
+ggplot(gdp_area_species, aes(x = log(AREA), y = Web.count, color = Continent) ) +
+geom_point() +
+  scale_color_viridis(discrete = T) +
+  geom_smooth(method = "glm", se = T,
+              method.args = list(family = "poisson")) +
+  labs(x="Country area", y="Networks") +
+  theme_classic()
+
+
+#research investment per country
 ggplot(gdp_area_species, aes(x = ResInvestTotal, y = Web.count, color = Hemisphere) ) +
   geom_point() +
   geom_smooth(method = "lm", se = F)
+
+ggplot(gdp_area_species, aes(x = log(ResInvestTotal), y = Web.count, color = Continent) ) +
+geom_point() +
+  scale_color_viridis(discrete = T) +
+  geom_smooth(method = "lm", se = F) +
+  labs(x="Country area", y="Networks") +
+  theme_classic()
+
+
 
 ggplot(gdp_area_species, aes(x = CL_Species, y = Web.count, color = Hemisphere) ) +
   geom_point() +
