@@ -157,16 +157,27 @@ ggplot(gdp_area_species, aes(x = ResInvestTotal, y = Web.count, color = Hemisphe
 ggplot(gdp_area_species, aes(x = log(ResInvestTotal), y = Web.count, color = Continent) ) +
 geom_point() +
   scale_color_viridis(discrete = T) +
-  geom_smooth(method = "lm", se = F) +
+  geom_smooth(method = "glm", se = T) +
   labs(x="Country area", y="Networks") +
   theme_classic()
 
 
-
+#bees species per country
 ggplot(gdp_area_species, aes(x = CL_Species, y = Web.count, color = Hemisphere) ) +
   geom_point() +
   geom_smooth(method = "lm", se = F)
 
+ggplot(gdp_area_species, aes(x = CL_Species, y = Web.count, color = Continent) ) +
+  geom_point() +
+  scale_color_viridis(discrete = T) +
+  geom_smooth(method = "glm", se = T,
+              method.args = list(family = "poisson")) +
+  labs(x="Bees species", y="Networks") +
+  theme_classic()
+
+
+
+#trying the predict lines
 gdp_area_species$fit <- predict(country.mod)
 
 ggplot(gdp_area_species, aes(x = log(AREA), y = Web.count, color = Continent)) +
