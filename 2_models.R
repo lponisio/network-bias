@@ -2,7 +2,7 @@ rm(list=ls())
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
-## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
+setwd("C:/Users/emanu/Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
 
@@ -67,21 +67,25 @@ summary(biome.area.mod.S)
 
 #grouping a model with all biome data
 
-biome.net.m1 <- glm(Webs ~ log(Area), data = biomes_web_data[1:28,], family = "poisson")
+biome.net.m1 <- glm(Webs ~ log(Area),
+                    data = biomes_web_data[biomes_web_data$Hemisphere!='Global',],
+                    family = "poisson")
 summary(biome.net.m1)
 plot(biome.net.m1)
 
-biome.net.m2 <- glm(Webs ~ log(Area) + Hemisphere, data = biomes_web_data[1:28,],
-                  family = "poisson")
+biome.net.m2 <- glm(Webs ~ scale(log(Area)) * Hemisphere,
+                    data = biomes_web_data[biomes_web_data$Hemisphere!='Global',],
+                    family = "poisson")
 summary(biome.net.m2)
 plot(biome.net.m2)
 
-
 #graph
-ggplot(biomes_web_data[1:28,], aes(x = log(Area), y = Webs, color = Hemisphere) ) +
+ggplot(biomes_web_data[biomes_web_data$Hemisphere!='Global',], aes(x = log(Area), y = Webs, color = Hemisphere) ) +
   geom_point() +
-  geom_smooth(method = "glm", se = T)
+  geom_smooth(method = "glm", se = T,
+              method.args = list(family = "poisson"))
 
+biomes_web_data$logArea <- log(biomes_web_data$Area)
 
 ## ***********************************************
 ## GLMM Models
@@ -91,17 +95,29 @@ ggplot(biomes_web_data[1:28,], aes(x = log(Area), y = Webs, color = Hemisphere) 
 gdp_area_species <- na.omit(gdp_area_species)
 
 country.mod <- glmer(Web.count ~
-                       log(ResInvestTotal)+
-                       log(AREA)+
-                       log(CL_Species)+
-                       (1|Hemisphere)+
+                       log(ResInvestTotal)*Hemisphere +
+                       log(AREA)*Hemisphere +
+                       log(CL_Species)*Hemisphere+
                        (1|Continent),
                        data=gdp_area_species, family = "poisson")
 
 summary(country.mod)
-
+vif(country.mod)
 r.squaredGLMM(country.mod)
 
+library(brms)
+
+country.mod <- brm(bf(Web.count ~
+                       log(ResInvestTotal)*Continent +
+                       log(AREA)*Continent +
+                       log(CL_Species)*Continent),
+                      data=gdp_area_species,
+                   chains=2,
+                   inits=0,
+                   iter=10^6)
+
+summary(country.mod)
+AIC(country.mod)
 plot_model(country.mod)
 tab_model(country.mod)
 
