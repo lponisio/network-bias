@@ -68,17 +68,20 @@ summary(biome.area.mod.S)
 
 #grouping a model with all biome data
 
-biome.net.m1 <- glm(Webs ~ log(Area),
+biome.net.m1 <- glm(Webs ~ log(Area) + Hemisphere,
                     data = biomes_web_data[biomes_web_data$Hemisphere!='Global',],
                     family = "poisson")
 summary(biome.net.m1)
 plot(biome.net.m1)
 
-biome.net.m2 <- glm(Webs ~ scale(log(Area)) * Hemisphere,
+# model with hemisphere interaction
+biome.net.m2 <- glm(Webs ~ log(Area) * Hemisphere,
                     data = biomes_web_data[biomes_web_data$Hemisphere!='Global',],
                     family = "poisson")
 summary(biome.net.m2)
 plot(biome.net.m2)
+
+anova(biome.net.m1, biome.net.m2)
 
 #graph
 biomes_web_data$logArea <- log(biomes_web_data$Area)
@@ -106,12 +109,17 @@ country.mod <- glmer(Web.count ~
                        log(ResInvestTotal)*Hemisphere +
                        log(AREA)*Hemisphere +
                        log(CL_Species)*Hemisphere+
+                       #log(AREA)*log(CL_Species)*Hemisphere+
                        (1|Continent),
                        data=gdp_area_species, family = "poisson")
 
 summary(country.mod)
 vif(country.mod)
 r.squaredGLMM(country.mod)
+
+library(effects)
+View()
+plot(allEffects(country.mod))
 
 #Bayesian model, but takes a long time
 library(brms)
@@ -123,7 +131,7 @@ country.mod <- brm(bf(Web.count ~
                       data=gdp_area_species,
                    chains=2,
                    inits=0,
-                   iter=10^6)
+                   iter=10^5)
 
 summary(country.mod)
 AIC(country.mod)
@@ -158,7 +166,7 @@ ggplot(gdp_area_species, aes(x = log(ResInvestTotal), y = Web.count, color = Con
 geom_point() +
   scale_color_viridis(discrete = T) +
   geom_smooth(method = "glm", se = T) +
-  labs(x="Country area", y="Networks") +
+  labs(x="Research investment", y="Networks") +
   theme_classic()
 
 
