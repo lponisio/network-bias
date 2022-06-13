@@ -2,7 +2,7 @@ rm(list=ls())
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
-## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
+setwd("C:/Users/emanu/Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
 
@@ -81,7 +81,7 @@ biome.net.m2 <- glm(Webs ~ log(Area) * Hemisphere,
 summary(biome.net.m2)
 plot(biome.net.m2)
 
-anova(biome.net.m1, biome.net.m2)
+
 
 #graph
 biomes_web_data$logArea <- log(biomes_web_data$Area)
@@ -105,33 +105,41 @@ ggplot(biomes_web_data[biomes_web_data$Hemisphere!='Global',],
 #GDP x Area x Species
 gdp_area_species <- na.omit(gdp_area_species)
 
-country.mod <- glmer(Web.count ~
-                       log(ResInvestTotal)*Hemisphere +
-                       log(AREA)*Hemisphere +
-                       log(CL_Species)*Hemisphere+
-                       #log(AREA)*log(CL_Species)*Hemisphere+
-                       (1|Continent),
-                       data=gdp_area_species, family = "poisson")
+gdp_area_species <- gdp_area_species[gdp_area_species$Continent != "Oceania",]
+gdp_area_species$Continent <- factor(gdp_area_species$Continent,
+                                     levels=c("North America",
+                                              "South America",
+                                              "Africa",
+                                              "Europe",
+                                              "Asia"))
+library(pscl)
+library(ZIM)
+country.mod <- zero(Web.count ~
+                       #log(ResInvestTotal)*Continent +
+                       log(AREA)*Continent +
+                       log(CL_Species)*Continent,
+                       #(1|Continent),
+                       data=gdp_area_species, dist = "poisson") #family = "quasipoisson")
 
 summary(country.mod)
 vif(country.mod)
-r.squaredGLMM(country.mod)
 
+plot(country.mod)
+anova(country.mod)
 library(effects)
-View()
 plot(allEffects(country.mod))
 
 #Bayesian model, but takes a long time
 library(brms)
 
-country.mod <- brm(bf(Web.count ~
+country.mod.2 <- brm(bf(Web.count ~
                        log(ResInvestTotal)*Continent +
                        log(AREA)*Continent +
                        log(CL_Species)*Continent),
                       data=gdp_area_species,
                    chains=2,
                    inits=0,
-                   iter=10^5)
+                   iter=2^5, family = zero_inflated_poisson())
 
 summary(country.mod)
 AIC(country.mod)
@@ -146,12 +154,12 @@ plot(pr)
 #area per country
 ggplot(gdp_area_species, aes(x = AREA, y = Web.count, color = Continent) ) +
   geom_point() +
-  geom_smooth(method = "lm", se = T)
+  geom_smooth(method = "lm", se = F)
 
 ggplot(gdp_area_species, aes(x = log(AREA), y = Web.count, color = Continent) ) +
 geom_point() +
   scale_color_viridis(discrete = T) +
-  geom_smooth(method = "glm", se = T,
+  geom_smooth(method = "glm", se = F,
               method.args = list(family = "poisson")) +
   labs(x="Country area", y="Networks") +
   theme_classic()
