@@ -26,7 +26,7 @@ load(file="../network-bias-saved/saved/area_richness_web.Rdata")
 
 #graphs
 
-#box plot for networks' latitude
+#general box plot for networks' latitude
 #violin plot
 p <- ggplot(webs, aes(x = "", y=LAT)) +
   geom_violin(trim=FALSE, fill="gray") +
@@ -42,6 +42,48 @@ tiff('nets_lat.tif', w=3000, h=6000, units="px", res=600, compression = "lzw")
 p
 dev.off()
 
+#by decade box plot for networks' latitude
+#violin plot
+summary(webs)
+webs$Publi_Decade <- as.factor(webs$Publi_Decade)
+
+p <- ggplot(webs, aes(x = "", y = LAT)) +
+  geom_boxplot(width=0.5) +
+  labs(x="General", y = "Latitude")+
+  scale_y_continuous(breaks = seq(-50, 100, by = 25)) +
+  geom_jitter(shape=16, position=position_jitter(0.2), alpha=0.3) +
+  scale_color_grey() +
+  theme_classic()
+
+tiff('nets_lat_general.tif', w=1500, h=3000, units="px", res=600, compression = "lzw")
+p
+dev.off()
+
+g <- ggplot(webs, aes(x = Publi_Decade, y = LAT)) +
+  geom_boxplot(width=0.5) +
+  labs(x="Years", y = "Latitude") +
+  scale_y_continuous(breaks = seq(-50, 100, by = 25)) +
+  geom_jitter(shape=16, position=position_jitter(0.2), alpha=0.3) +
+  scale_color_grey() +
+  theme_classic()
+
+tiff('nets_lat_decade.tif', w=6000, h=3000, units="px", res=600, compression = "lzw")
+g
+dev.off()
+
+p <- ggplot(webs, aes(x = Publi_Decade, y=LAT)) +
+  geom_violin(trim=FALSE, fill="gray") +
+  labs(x=NULL, y = "Latitude") +
+  geom_boxplot(width=0.1)+
+  scale_y_continuous(breaks = seq(-50, 100, by = 25)) +
+  geom_jitter(shape=16, position=position_jitter(0.2)) +
+  scale_color_grey() +
+  theme_classic()
+p
+
+tiff('nets_lat.tif', w=3000, h=6000, units="px", res=600, compression = "lzw")
+p
+dev.off()
 
 #proportions step 1
 #counting the proportions
