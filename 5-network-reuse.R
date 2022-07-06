@@ -1,11 +1,12 @@
 rm(list=ls())
 library(tidyverse)
+library(dplyr)
 
 #
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
-## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
+setwd("C:/Users/emanu/Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
 
@@ -26,12 +27,17 @@ nets <- nets[!is.na(nets$From_Database),]
 
 #organizing the necessary data
 reused.web <- nets %>%
-    group_by(Web_Code, Web_Year, Web_Decade, Data_Status="Reused",
+    group_by(Web_Code, Web_Year, Web_Decade, Data_Status,
              Country, From_Database,
              ISO3, Biome_WWF, Continent, Hemisphere) %>%
     summarise(ReusedCount = n())
 
+#removing duplication
+reused.web <- reused.web[!duplicated(reused.web$Web_Code), ]
 
+#if the paper is original and never been reused the count should be 0
+original <- reused.web$Data_Status %in% "Original"
+reused.web$ReusedCount[original] <- 0
 
 #checking the frequency of each network
 n_occur <- data.frame(table(nets$Web_Code))
