@@ -14,7 +14,7 @@ library(viridis)
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
-setwd("C:/Users/emanu/Dropbox (University of Oregon)")
+## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
 
@@ -304,3 +304,90 @@ ggplot(world_carto2) +
   scale_fill_gradientn(colours = heat.colors(n = 10,
                                              alpha = 0.5,
                                              rev = TRUE))
+
+
+################
+##MODELS GRAPHS
+################
+library(magrittr)
+library(dplyr)
+library(purrr)
+library(forcats)
+library(tidyr)
+library(modelr)
+library(ggdist)
+library(tidybayes)
+library(ggplot2)
+library(cowplot)
+library(rstan)
+library(brms)
+library(ggrepel)
+library(RColorBrewer)
+library(gganimate)
+library(posterior)
+
+theme_set(theme_tidybayes() + panel_border())
+
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+
+#graph for biomes
+load(file="../network-bias-saved/saved/biomes_data.Rdata")
+load(file="../network-bias/saved/biome_mod_negbin.Rdata")
+
+biomes_web_data[biomes_web_data$Hemisphere!='Global',] %>%
+  ggplot(aes(y = Webs, x = Area)) +
+  geom_point(aes(colour = factor(Hemisphere)), size = 3)
+
+get_variables(biome.mod)
+
+biomes_web_data[biomes_web_data$Hemisphere!='Global',] %>%
+  group_by(Hemisphere) %>%
+  data_grid(Area = seq_range (Area, n=26)) %>%
+  add_epred_draws(biome.mod) %>%
+  ggplot(aes(x = log(Area), y = Webs, color = ordered(Hemisphere))) +
+  stat_lineribbon(aes(y = .epred)) +
+  geom_point(data = biomes_web_data[biomes_web_data$Hemisphere!='Global',]) +
+  scale_fill_brewer(palette = "Greys") +
+  scale_color_brewer(palette = "Set2")
+
+#graph for countries
+load(file="../network-bias-saved/saved/webs_all_data.Rdata")
+load(file="../network-bias/saved/country_mod_negbin.Rdata")
+
+gdp_area_species %>%
+  ggplot(aes(y = Web.count, x = ResInvestTotal)) +
+  geom_point(aes(colour = factor(Continent)), size = 2)
+
+get_variables(country.mod)
+plot(country.mod)
+summary(country.mod)
+hist(gdp_area_species$CL_Species)
+
+gdp_area_species <- gdp_area_species[gdp_area_species$CL_Species != max(gdp_area_species$CL_Species, na.rm=TRUE),]
+
+gdp_area_species <- gdp_area_species[gdp_area_species$Continent
+                                     != "Oceania",]
+
+gdp_area_species$Continent  <-  factor(gdp_area_species$Continent,
+                                       levels=c("North America",
+                                                "Asia", "Africa",
+                                                "Europe",
+                                                "South America"))
+
+
+gdp_area_species %>%
+  group_by(Continent) %>%
+  data_grid(CL_Species = seq_range(CL_Species, n=10), AREA =mean(AREA),
+            ResInvestTotal= mean(ResInvestTotal, na.rm=TRUE)) %>%
+  add_epred_draws(country.mod) %>%
+  ggplot(aes(x = log(CL_Species), y = Web.count, color = ordered(Continent))) +
+  stat_lineribbon(aes(y = .epred)) +
+  geom_point(data = gdp_area_species) +
+  scale_fill_brewer(palette = "Greys") +
+  scale_color_brewer(palette = "Set2")
+
+
+
+
