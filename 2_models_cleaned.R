@@ -144,7 +144,58 @@ write.ms.table(reuse.mod.zero.inf,  "reuse_mod_zero_inf_negbin",
                save.path=save.path)
 
 
+library(tidyverse)
+library(styler)
+library(ggExtra)
+library(knitr)
+library(brms)
+library(cowplot)
+library(gridExtra)
+library(skimr)
+library(DiagrammeR)
+library(rayshader)
+library(av)
+library(rgl)
+library(tibble)
+
+post_samplesM1_tbl <-
+  posterior_samples(biome.mod) %>%
+  select(-lp__) %>%
+  round(digits = 3)
+
+post_samplesM1_tbl %>%
+  head(10) %>%
+  kable(align = rep("c", 3))
+
+mod_1_summary_tbl <-
+  posterior_summary(biome.mod) %>%
+  as.data.frame() %>%
+  rownames_to_column() %>%
+  as_tibble() %>%
+  mutate_if(is.numeric, funs(as.character(signif(., 2)))) %>%
+  mutate_at(.vars = c(2:5), funs(as.numeric(.)))
+mod_1_summary_tbl %>%
+  kable(align = rep("c", 5))
 
 
-
-
+mean_regressionM1_fig <-
+  biomes_web_data[biomes_web_data$Hemisphere!='Global',] %>%
+  ggplot(aes(y = Webs, x = Area)) +
+  geom_point(
+    colour = "#481567FF",
+    size = 2,
+    alpha = 0.6
+  ) +
+  geom_abline(aes(intercept = b_Intercept, slope = b_scalelogArea),
+              data = post_samplesM1_tbl,
+              alpha = 0.1, color = "gray50"
+  ) +
+  geom_abline(
+    slope = mean(post_samplesM1_tbl$b_scalelogArea),
+    intercept = mean(post_samplesM1_tbl$b_Intercept),
+    color = "blue", size = 1
+  ) +
+  labs(
+    x = "Area per biome",
+    y = "Networks"
+  )
