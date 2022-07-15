@@ -375,7 +375,7 @@ gdp_area_species$Continent  <-  factor(gdp_area_species$Continent,
                                                 "Asia", "Africa",
                                                 "Europe",
                                                 "South America"))
-
+####SPECIES BY COUNTRY
 
 gdp_area_species %>%
   group_by(Continent) %>%
@@ -388,6 +388,29 @@ gdp_area_species %>%
   scale_fill_brewer(palette = "Greys") +
   scale_color_brewer(palette = "Set2")
 
+#####AREA BY COUNTRY
+gdp_area_species %>%
+  group_by(Continent) %>%
+  data_grid(AREA = seq_range(AREA, n=10), CL_Species = mean(CL_Species),
+            ResInvestTotal= mean(ResInvestTotal, na.rm=TRUE)) %>%
+  add_epred_draws(country.mod) %>%
+  ggplot(aes(x = log(AREA), y = Web.count, color = ordered(Continent))) +
+  stat_lineribbon(aes(y = .epred)) +
+  geom_point(data = gdp_area_species) +
+  scale_fill_brewer(palette = "Greys") +
+  scale_color_brewer(palette = "Set2")
 
+
+#######RESEARCH INVESTMENT BY COUNTRY
+gdp_area_species %>%
+  group_by(Continent) %>%
+  data_grid(ResInvestTotal = seq_range(ResInvestTotal, n=10), CL_Species = mean(CL_Species),
+            AREA= mean(AREA, na.rm=TRUE)) %>%
+  add_epred_draws(country.mod) %>%
+  ggplot(aes(x = log(ResInvestTotal), y = Web.count, color = ordered(Continent))) +
+  stat_lineribbon(aes(y = .epred)) +
+  geom_point(data = gdp_area_species) +
+  scale_fill_brewer(palette = "Greys") +
+  scale_color_brewer(palette = "Set2")
 
 

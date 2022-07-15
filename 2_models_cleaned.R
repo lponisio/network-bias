@@ -143,6 +143,8 @@ save(reuse.mod.zero.inf, reused.web,
 write.ms.table(reuse.mod.zero.inf,  "reuse_mod_zero_inf_negbin",
                save.path=save.path)
 
+conditional_effects(biome.mod)
+conditional_effects(country.mod)
 
 library(tidyverse)
 library(styler)
