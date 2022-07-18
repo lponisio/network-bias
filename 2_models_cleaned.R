@@ -201,3 +201,12 @@ mean_regressionM1_fig <-
     x = "Area per biome",
     y = "Networks"
   )
+
+
+webs %>% mutate(Hemisphere =
+                     case_when(LAT > 0 ~ "Northern",
+                               LAT < 0 ~ "Southern"),
+                .after=LONG)
+
+
+
