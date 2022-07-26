@@ -342,15 +342,22 @@ biomes_web_data[biomes_web_data$Hemisphere!='Global',] %>%
 
 get_variables(biome.mod)
 
-biomes_web_data[biomes_web_data$Hemisphere!='Global',] %>%
+biome_mod_fig <- biomes_web_data[biomes_web_data$Hemisphere!='Global',] %>%
   group_by(Hemisphere) %>%
   data_grid(Area = seq_range (Area, n=26)) %>%
   add_epred_draws(biome.mod) %>%
   ggplot(aes(x = log(Area), y = Webs, color = ordered(Hemisphere))) +
   stat_lineribbon(aes(y = .epred)) +
   geom_point(data = biomes_web_data[biomes_web_data$Hemisphere!='Global',]) +
+  xlab("Biome area (log)") +
+  ylab("Networks") +
   scale_fill_brewer(palette = "Greys") +
-  scale_color_brewer(palette = "Set2")
+  scale_color_brewer(palette = "Set2") +
+  theme(legend.position="bottom", legend.box = "vertical")
+
+tiff('model_biome_2.tif', w=2000, h=2200, units="px", res=400, compression = "lzw")
+biome_mod_fig
+dev.off()
 
 #graph for countries
 load(file="../network-bias-saved/saved/webs_all_data.Rdata")
@@ -375,16 +382,19 @@ gdp_area_species$Continent  <-  factor(gdp_area_species$Continent,
                                                 "Asia", "Africa",
                                                 "Europe",
                                                 "South America"))
+summary(gdp_area_species)
 ####SPECIES BY COUNTRY
 
 gdp_area_species %>%
   group_by(Continent) %>%
-  data_grid(CL_Species = seq_range(CL_Species, n=10), AREA =mean(AREA),
-            ResInvestTotal= mean(ResInvestTotal, na.rm=TRUE)) %>%
+  data_grid(AREA = seq_range(AREA, n=10), CL_Species = mean(CL_Species),
+            ResInvestTotal = mean(ResInvestTotal, na.rm=TRUE)) %>%
   add_epred_draws(country.mod) %>%
   ggplot(aes(x = log(CL_Species), y = Web.count, color = ordered(Continent))) +
   stat_lineribbon(aes(y = .epred)) +
   geom_point(data = gdp_area_species) +
+  xlab("Biome area (log)") +
+  ylab("Networks") +
   scale_fill_brewer(palette = "Greys") +
   scale_color_brewer(palette = "Set2")
 

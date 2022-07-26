@@ -202,6 +202,9 @@ mean_regressionM1_fig <-
     y = "Networks"
   )
 
+tiff('model_biome.tif', w=1500, h=1500, units="px", res=600, compression = "lzw")
+mean_regressionM1_fig
+dev.off()
 
 webs %>% mutate(Hemisphere =
                      case_when(LAT > 0 ~ "Northern",
