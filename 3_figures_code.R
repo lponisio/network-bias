@@ -325,6 +325,7 @@ library(ggrepel)
 library(RColorBrewer)
 library(gganimate)
 library(posterior)
+library(ggforce)
 
 theme_set(theme_tidybayes() + panel_border())
 
@@ -346,16 +347,22 @@ biome_mod_fig <- biomes_web_data[biomes_web_data$Hemisphere!='Global',] %>%
   group_by(Hemisphere) %>%
   data_grid(Area = seq_range (Area, n=26)) %>%
   add_epred_draws(biome.mod) %>%
-  ggplot(aes(x = log(Area), y = Webs, color = ordered(Hemisphere))) +
-  stat_lineribbon(aes(y = .epred)) +
+  ggplot(aes(x = log(Area), y = log(Webs+1), color = ordered(Hemisphere))) +
+  stat_lineribbon(aes(y = log(.epred+1))) +
   geom_point(data = biomes_web_data[biomes_web_data$Hemisphere!='Global',]) +
   xlab("Biome area (log)") +
-  ylab("Networks") +
+  ylab("Networks (log)") +
+  labs(colour="Hemisphere")+
   scale_fill_brewer(palette = "Greys") +
   scale_color_brewer(palette = "Set2") +
-  theme(legend.position="bottom", legend.box = "vertical")
+  theme(legend.position="bottom", legend.box = "vertical",
+        axis.text=element_text(size=10),
+        axis.title=element_text(size=14,face="bold"),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 12))+
+  guides(fill=guide_legend("Confidence level"))
 
-tiff('model_biome_2.tif', w=2000, h=2200, units="px", res=400, compression = "lzw")
+png('model_biome_2.png', w=2000, h=2200, units="px", res=400)
 biome_mod_fig
 dev.off()
 
@@ -383,36 +390,48 @@ gdp_area_species$Continent  <-  factor(gdp_area_species$Continent,
                                                 "Europe",
                                                 "South America"))
 summary(gdp_area_species)
-####SPECIES BY COUNTRY
+####AREA BY COUNTRY
 
-gdp_area_species %>%
+model_country_area <- gdp_area_species %>%
   group_by(Continent) %>%
   data_grid(AREA = seq_range(AREA, n=10), CL_Species = mean(CL_Species),
             ResInvestTotal = mean(ResInvestTotal, na.rm=TRUE)) %>%
   add_epred_draws(country.mod) %>%
-  ggplot(aes(x = log(CL_Species), y = Web.count, color = ordered(Continent))) +
-  stat_lineribbon(aes(y = .epred)) +
-  geom_point(data = gdp_area_species) +
-  xlab("Biome area (log)") +
-  ylab("Networks") +
-  scale_fill_brewer(palette = "Greys") +
-  scale_color_brewer(palette = "Set2")
-
-#####AREA BY COUNTRY
-gdp_area_species %>%
-  group_by(Continent) %>%
-  data_grid(AREA = seq_range(AREA, n=10), CL_Species = mean(CL_Species),
-            ResInvestTotal= mean(ResInvestTotal, na.rm=TRUE)) %>%
-  add_epred_draws(country.mod) %>%
   ggplot(aes(x = log(AREA), y = Web.count, color = ordered(Continent))) +
   stat_lineribbon(aes(y = .epred)) +
   geom_point(data = gdp_area_species) +
+  xlab("Country area (log)") +
+  ylab("Networks") +
   scale_fill_brewer(palette = "Greys") +
-  scale_color_brewer(palette = "Set2")
+  scale_color_brewer(palette = "Set2") +
+  theme(legend.position="bottom", legend.box = "vertical")
+  #facet_zoom(xlim = c(14, 16))
 
+tiff('model_country_area.tif', w=2500, h=2200, units="px", res=400, compression = "lzw")
+model_country_area
+dev.off()
+
+#####BEE SPECIES BY COUNTRY
+model_bees <- gdp_area_species %>%
+  group_by(Continent) %>%
+  data_grid(CL_Species = seq_range(CL_Species, n=10), AREA = mean(AREA),
+            ResInvestTotal= mean(ResInvestTotal, na.rm=TRUE)) %>%
+  add_epred_draws(country.mod) %>%
+  ggplot(aes(x = log(CL_Species), y = Web.count, color = ordered(Continent))) +
+  stat_lineribbon(aes(y = .epred)) +
+  geom_point(data = gdp_area_species) +
+  xlab("Bees' species (log)") +
+  ylab("Networks") +
+  scale_fill_brewer(palette = "Greys") +
+  scale_color_brewer(palette = "Set2") +
+  theme(legend.position="bottom", legend.box = "vertical")
+
+tiff('model_bees.tif', w=2500, h=2200, units="px", res=400, compression = "lzw")
+model_bees
+dev.off()
 
 #######RESEARCH INVESTMENT BY COUNTRY
-gdp_area_species %>%
+res_inv_model <- gdp_area_species %>%
   group_by(Continent) %>%
   data_grid(ResInvestTotal = seq_range(ResInvestTotal, n=10), CL_Species = mean(CL_Species),
             AREA= mean(AREA, na.rm=TRUE)) %>%
@@ -420,7 +439,12 @@ gdp_area_species %>%
   ggplot(aes(x = log(ResInvestTotal), y = Web.count, color = ordered(Continent))) +
   stat_lineribbon(aes(y = .epred)) +
   geom_point(data = gdp_area_species) +
+  xlab("Research investment (log)") +
+  ylab("Networks") +
   scale_fill_brewer(palette = "Greys") +
-  scale_color_brewer(palette = "Set2")
+  scale_color_brewer(palette = "Set2") +
+  theme(legend.position="bottom", legend.box = "vertical")
+
+
 
 
