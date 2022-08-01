@@ -391,23 +391,29 @@ gdp_area_species$Continent  <-  factor(gdp_area_species$Continent,
                                                 "South America"))
 summary(gdp_area_species)
 ####AREA BY COUNTRY
+attach(gdp_area_species)
 
 model_country_area <- gdp_area_species %>%
   group_by(Continent) %>%
   data_grid(AREA = seq_range(AREA, n=10), CL_Species = mean(CL_Species),
             ResInvestTotal = mean(ResInvestTotal, na.rm=TRUE)) %>%
   add_epred_draws(country.mod) %>%
-  ggplot(aes(x = log(AREA), y = Web.count, color = ordered(Continent))) +
-  stat_lineribbon(aes(y = .epred)) +
+  ggplot(aes(x = log(AREA), y = log(Web.count+1), color = ordered(Continent))) +
+  stat_lineribbon(aes(y = log(.epred+1))) +
   geom_point(data = gdp_area_species) +
   xlab("Country area (log)") +
-  ylab("Networks") +
+  ylab("Networks (log)") +
+  labs(colour=NULL)+
   scale_fill_brewer(palette = "Greys") +
   scale_color_brewer(palette = "Set2") +
-  theme(legend.position="bottom", legend.box = "vertical")
-  #facet_zoom(xlim = c(14, 16))
+  theme(legend.position="bottom", legend.box = "vertical",
+        axis.text=element_text(size=10),
+        axis.title=element_text(size=14,face="bold"),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 12))+
+  guides(fill=guide_legend("Confidence level"))
 
-tiff('model_country_area.tif', w=2500, h=2200, units="px", res=400, compression = "lzw")
+png('model_country_area.png', w=2900, h=2200, units="px", res=400)
 model_country_area
 dev.off()
 
@@ -417,34 +423,48 @@ model_bees <- gdp_area_species %>%
   data_grid(CL_Species = seq_range(CL_Species, n=10), AREA = mean(AREA),
             ResInvestTotal= mean(ResInvestTotal, na.rm=TRUE)) %>%
   add_epred_draws(country.mod) %>%
-  ggplot(aes(x = log(CL_Species), y = Web.count, color = ordered(Continent))) +
-  stat_lineribbon(aes(y = .epred)) +
+  ggplot(aes(x = log(CL_Species), y = log(Web.count+1), color = ordered(Continent))) +
+  stat_lineribbon(aes(y = log(.epred+1))) +
   geom_point(data = gdp_area_species) +
-  xlab("Bees' species (log)") +
-  ylab("Networks") +
+  xlab("Bee species (log)") +
+  ylab("Networks (log)") +
+  labs(colour=NULL)+
   scale_fill_brewer(palette = "Greys") +
   scale_color_brewer(palette = "Set2") +
-  theme(legend.position="bottom", legend.box = "vertical")
+  theme(legend.position="bottom", legend.box = "vertical",
+        axis.text=element_text(size=10),
+        axis.title=element_text(size=14,face="bold"),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 12))+
+  guides(fill=guide_legend("Confidence level"))
 
-tiff('model_bees.tif', w=2500, h=2200, units="px", res=400, compression = "lzw")
+png('model_bees.png', w=2900, h=2200, units="px", res=400)
 model_bees
 dev.off()
 
 #######RESEARCH INVESTMENT BY COUNTRY
-res_inv_model <- gdp_area_species %>%
+model_res_inv <- gdp_area_species %>%
   group_by(Continent) %>%
   data_grid(ResInvestTotal = seq_range(ResInvestTotal, n=10), CL_Species = mean(CL_Species),
             AREA= mean(AREA, na.rm=TRUE)) %>%
   add_epred_draws(country.mod) %>%
-  ggplot(aes(x = log(ResInvestTotal), y = Web.count, color = ordered(Continent))) +
-  stat_lineribbon(aes(y = .epred)) +
+  ggplot(aes(x = log(ResInvestTotal), y = log(Web.count+1), color = ordered(Continent))) +
+  stat_lineribbon(aes(y = log(.epred+1))) +
   geom_point(data = gdp_area_species) +
   xlab("Research investment (log)") +
-  ylab("Networks") +
+  ylab("Networks (log)") +
+  labs(colour=NULL)+
   scale_fill_brewer(palette = "Greys") +
   scale_color_brewer(palette = "Set2") +
-  theme(legend.position="bottom", legend.box = "vertical")
+  theme(legend.position="bottom", legend.box = "vertical",
+        axis.text=element_text(size=10),
+        axis.title=element_text(size=14,face="bold"),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 12))+
+  guides(fill=guide_legend("Confidence level"))
 
-
+png('model_res_inv.png', w=2900, h=2200, units="px", res=400)
+model_res_inv
+dev.off()
 
 
