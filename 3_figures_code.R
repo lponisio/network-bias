@@ -468,3 +468,21 @@ model_res_inv
 dev.off()
 
 
+
+# Small plot
+library(ggplot2)
+library(viridis)
+
+biomes_web_data <- biomes_web_data[biomes_web_data$Hemisphere
+                                     != "Global",]
+
+bar_biomes <- ggplot(biomes_web_data, aes(fill=Hemisphere, y=Webs, x=BiomeName)) +
+  geom_bar(position="stack", stat="identity") +
+  scale_fill_viridis(discrete = T, option = "D") +
+  #theme_ipsum() +
+  xlab("") +
+  coord_flip()
+
+png('bar_biomes.png', w=4900, h=2200, units="px", res=400)
+bar_biomes
+dev.off()
