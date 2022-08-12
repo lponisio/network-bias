@@ -472,13 +472,15 @@ dev.off()
 # Small plot
 library(ggplot2)
 library(viridis)
+library(forcats)
 
-biomes_web_data <- biomes_web_data[biomes_web_data$Hemisphere
-                                     != "Global",]
+biomes_web_data <- biomes_web_data[biomes_web_data$Hemisphere != "Global",]
+
+fct_reorder(biomes_web_data$BiomeName, biomes_web_data$Webs, .desc = T)
 
 bar_biomes <- ggplot(biomes_web_data, aes(fill=Hemisphere, y=Webs, x=BiomeName)) +
   geom_bar(position="stack", stat="identity") +
-  scale_fill_viridis(discrete = T, option = "D") +
+  scale_fill_viridis(discrete = T) +
   #theme_ipsum() +
   xlab("") +
   coord_flip()
