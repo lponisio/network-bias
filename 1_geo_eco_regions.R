@@ -9,7 +9,7 @@ library(dplyr)
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
-## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
+setwd("C:/Users/emanu/Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
 
@@ -17,42 +17,46 @@ setwd("network-bias-saved")
 ## General cleaning of web data
 ## ***********************************************
 
-## webs <- read.csv("network_papers_2021.csv",  sep=";")
-## res.inv <- read.csv("research_expenditure.csv")
-## gdp <- read.csv("gdp.csv")
-## biome.code <- read.csv("biome_codes.csv")
-## countries <- read.csv("bees_by_country.csv")
+webs <- read.csv("network_papers_2021_2.csv",  sep=";")
+res.inv <- read.csv("research_expenditure.csv")
+gdp <- read.csv("gdp.csv")
+biome.code <- read.csv("biome_codes.csv")
+countries <- read.csv("bees_by_country.csv")
 
-## ## fix issues in country names just to have them correct no longer
-## ## used for matching data
-## webs$Country[webs$Country == "Puerto Rico"] <- "USA"
-## webs$Country[webs$Country == "Hawaii"] <- "USA"
-## webs$Country[webs$Country == "New Zealand "] <- "New Zealand"
-## webs$Country[webs$Country == "Moroco"] <- "Morocco"
-## webs$Country[webs$Country == "USA"] <- "United States"
-## webs$Country[webs$Country == "UK"] <- "United Kingdom"
-## webs$Country[webs$Country == "England"] <- "United Kingdom"
-## webs$Country[webs$Country == "Venezuela"] <- "Venezuela, RB"
-## webs$Country[webs$Country == "Egypt"] <- "Egypt, Arab Rep."
+#fix issues in country names just to have them correct no longer used for matching data
+webs$Country[webs$Country == "puerto rico"] <- "usa"
+webs$Country[webs$Country == "hawaii"] <- "usa"
+webs$Country[webs$Country == "new zealand "] <- "new zealand"
+webs$Country[webs$Country == "moroco"] <- "morocco"
+webs$Country[webs$Country == "usa"] <- "united states"
+webs$Country[webs$Country == "uk"] <- "united kingdom"
+webs$Country[webs$Country == "england"] <- "united kingdom"
+webs$Country[webs$Country == "venezuela"] <- "venezuela, rb"
+webs$Country[webs$Country == "egypt"] <- "egypt, arab rep."
 
 ## ## webs without countries, nothing we can do here
-## sum(webs$Country == "")
-## webs$Country[webs$Country == ""] <- NA
-## webs$ISO3[webs$ISO3 == ""] <- NA
-## webs <- webs[!is.na(webs$Country),]
+sum(webs$Country == "")
+webs$Country[webs$Country == ""] <- NA
+webs$iso3[webs$ISO3 == ""] <- NA
+webs <- webs[!is.na(webs$Country),]
 
-## ## count up the webs in each country
-## country.real.dat <- table(webs$ISO3)
-## sort(country.real.dat)
+#
+country.real.data <- webs %>%
+  group_by(ISO3, Region)%>%
+  summarise(webs = n())
+
+## count up the webs in each Country
+#country.real.dat <- table(webs$iso3)
+#sort(country.real.dat)
 
 ## ## all should have a country code now
-## names(country.real.dat)[!names(country.real.dat) %in%
-##                         gdp$Country.Code]
+(country.real.data$ISO3)[!(country.real.data$ISO3) %in%
+                         gdp$Country.Code]
 
-## countries <- countries[, c("NAME", "ISO3", "AREA", "CL_Species")]
+countries <- countries[, c("ï..NAME", "ISO3", "AREA", "CL_Species")]
 
-## save(webs, res.inv, gdp, biome.code, countries, country.real.dat,
-##      file="../network-bias/data/rawData.Rdata")
+save(webs, res.inv, gdp, biome.code, countries, country.real.dat,
+      file="../network-bias/data/rawdata.rdata")
 
 ## ***********************************************
 ## join the web data with the gdp data
@@ -467,36 +471,18 @@ save(biome.webs, global.real.dat, northern.real.dat, globe.area.biome,
 
 
 
-## This functions takes site-species-abundance data and creates a
-## matrix where the sites are columns and the rows are species.
+############
+#adding region variable
 
-## samp2site.spp <- function(site, spp, abund, FUN=sum) {
-##   x <- tapply(abund, list(site = site, spp = spp), FUN)
-##   x[is.na(x)] <- 0
-##   return(x)
-## }
+gdp_area_species$Region <- webs$Region[match(
+  gdp_area_species$Country.Code,
+  webs$ISO3)]
 
-## by.decade <- split(net.country.decade,
-##                    net.country.decade$Publi_Decade)
+write.csv(gdp_area_species, file="gdp_area_species_region.csv",
+          row.names=FALSE)
 
-## by.decade <- by.decade[sapply(by.decade, nrow) > 5]
+gdp_area_species <- read.csv("gdp_area_species_region.csv",  sep=";")
 
-## decade.cat <- unlist(sapply(by.decade, function(x) x$Publi_Decade))
-## names(decade.cat) <- NULL
-
-## by.decade.mat <- lapply(by.decade, samp2site.spp, samp2site.spp=
-
-## dist.mat <- vegdist(comm.mat, method= "jaccard",
-##                     na.rm=TRUE, diag=TRUE)
-
-## beta.disper.result <- betadisper(dist.mat, GenSp,
-##                                  type="centroid")
-
-## ## Permutation test for F and simulate missing values to compare the
-## ## differences in the variances of the community composition of
-## ## parasites between bee species
-
-## perm.test <- permutest(beta.disper.result,
-##           control = permControl(nperm = 100),
-##           pairwise = TRUE)
+save(gdp_area_species,
+     file="../network-bias-saved/saved/gdp_area_species_region.rdata")
 

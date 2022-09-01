@@ -2,11 +2,11 @@ rm(list=ls())
 ## setwd("~/Dropbox (University of Oregon)/")
 setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
-## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
+setwd("C:/Users/emanu/Dropbox (University of Oregon)")
 
 source("network-bias/src/init.R")
 
-options(cores=5)
+# options(cores=5)
 ## ***********************************************
 ## Biome models
 ## ***********************************************
@@ -28,7 +28,7 @@ save(biome.mod,  biomes_web_data,
 write.ms.table(biome.mod, "biome_negbin",
                save.path=save.path)
 
-load(file="../network-bias/saved/biome_mod_negbin.Rdata")
+save(file="../network-bias/saved/biome_mod_negbin.Rdata")
 
 ## ***********************************************
 ## Country models
@@ -44,9 +44,10 @@ gdp_area_species$Continent  <-  factor(gdp_area_species$Continent,
                                                 "South America"))
 
 country.mod <- brm(bf(Web.count ~
-                        scale(log(ResInvestTotal))*Continent +
-                        scale(log(AREA))*Continent +
-                        scale(log(CL_Species))),
+                        scale(log(ResInvestTotal))*Region +
+                        scale(log(AREA))*Region +
+                        scale(log(CL_Species))*Region +
+                  (1|ISO3)),
                    data=gdp_area_species,
                    family="negbinomial",
                    chains=3,
