@@ -47,7 +47,7 @@ country.mod <- brm(bf(Web.count ~
                         scale(log(ResInvestTotal))*Region +
                         scale(log(AREA))*Region +
                         scale(log(CL_Species))*Region +
-                  (1|ISO3)),
+                        (1|Country.Code)),
                    data=gdp_area_species,
                    family="negbinomial",
                    chains=3,
