@@ -2,7 +2,7 @@ rm(list=ls())
 setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
-setwd("C:/Users/emanu/Dropbox (University of Oregon)")
+## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
 
 setwd("network-bias-saved")
 
@@ -26,6 +26,7 @@ library(sjPlot)
 library(ggplot2)
 library(ggeffects)
 library(viridis)
+library(brms)
 
 ## ***********************************************
 ## AREA by biome
@@ -129,7 +130,12 @@ anova(country.mod)
 library(effects)
 plot(allEffects(country.mod))
 
-#Bayesian model, but takes a long time
+
+## ***********************************************
+## Bayesian Model
+## ***********************************************
+# Bayesian model takes a long time, use the cluster
+
 library(brms)
 
 country.mod.2 <- brm(bf(Web.count ~
