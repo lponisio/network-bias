@@ -6,7 +6,7 @@ library(dplyr)
 
 #read data
 
-## setwd("~/Dropbox (University of Oregon)/")
+setwd("~/Dropbox (University of Oregon)/")
 ## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
 ## setwd("\Dropbox (University of Oregon)")
 ## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
