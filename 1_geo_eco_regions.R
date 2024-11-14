@@ -6,31 +6,22 @@ library(sf)
 library(dplyr)
 library(countrycode)
 
-
-
-#read data
-
-setwd("~/Dropbox (University of Oregon)/")
-## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
-## setwd("\Dropbox (University of Oregon)")
-## setwd("C:/Users/emanu/Dropbox (University of Oregon)")
-
-setwd("network-bias-saved")
+## ***********************************************
+source("~/lab_paths.R")
+local.path
 
 ## ***********************************************
 ## General cleaning of web data
 ## ***********************************************
-
+setwd(paste0(local.path, "network-bias-saved/raw/"))
 webs <- read.csv("network_papers_2021_2.csv",  sep=";")
 res.inv <- read.csv("research_expenditure.csv")
 gdp <- read.csv("gdp.csv")
 biome.code <- read.csv("biome_codes.csv")
 countries <- read.csv("bees_by_country.csv")
 
-
 # Standardize and validate country names
 webs$country_standardized <- countrycode(as.character(webs$Country), origin = "country.name", destination = "country.name")
-
 
 # Identify entries that were not matched to standard country names
 invalid_entries <- webs[is.na(webs$country_standardized), ]
@@ -48,24 +39,24 @@ country.real.data <- webs %>%
   group_by(ISO3, Region)%>%
   summarise(webs = n())
 
-
 ## ## all should have a country code now
 (country.real.data$ISO3)[!(country.real.data$ISO3) %in%
                          gdp$Country.Code]
 
-countries <- countries[, c("ï..NAME", "ISO3", "AREA", "CL_Species")]
 
-save(webs, res.inv, gdp, biome.code, countries, country.real.dat,
-      file="../network-bias/data/rawdata.rdata")
+
+countries <- countries[, c("NAME", "ISO3", "AREA", "CL_Species")]
+
+#Why save at this step?
+#save(webs, res.inv, gdp, biome.code, countries, country.real.data,
+#      file="../network-bias/data/rawdata.rdata")
 
 ## ***********************************************
 ## join the web data with the gdp data
 ## clean gdp data
 ## **********************************************
-load(file="../network-bias/data/rawData.Rdata")
 
-dim(gdp)
-## drop the codes for regions, and country groupings
+# drop the codes for regions, and country groupings
 ## also drop North Korea because they don't report well
 not.real.countries <- c("WLD", "AFE", "AFW", "ARB", "CEB", "CSS", "EAP",
                         "EAR", "EAS", "ECA", "ECS", "EMU", "EUU",
@@ -79,33 +70,41 @@ not.real.countries <- c("WLD", "AFE", "AFW", "ARB", "CEB", "CSS", "EAP",
                         "TLA", "TMM", "TSA", "TSS", "UMC", "PRK"
                         )
 
-dim(gdp)- length(not.real.countries)
+dim(gdp)
 gdp <- gdp[!gdp$Country.Code %in% not.real.countries,]
 dim(gdp)
+
+## **********************************************
+#######FROM HERE- what's the point of this
 
 ## we don't want to modify the original data because we will join it
 ## with other data later on with different missing country data
 
 ## which countries in the data are not in the gdp
-names(country.real.dat)[!names(country.real.dat) %in% gdp$Country.Name]
+names(country.real.data)[!names(country.real.data) %in% gdp$Country.Name]
 
+## **********************************************
 ## remove countries with NA gdp
 gdp <- gdp[!is.na(gdp$'X2020'),]
 
 ## countries with gdp data but no webs
+dim(gdp)
 no.webs <- gdp$Country.Code[!gdp$Country.Code %in%
-                            names(country.real.dat)]
+                            names(country.real.data)] #this does nothing
+dim(gdp)
+
+
+
+
 
 ## this is real data, there are no webs from these countries, so
 ## create 0 count data and add them to the data
 no.web.data <- rep(0, length(no.webs))
 names(no.web.data)  <- no.webs
 
-country.real.dat <- c(country.real.dat, no.web.data)
+country.real.dat.gdp <- c(country.real.data, no.web.data)
 
 ## match the countries in web data to gdp
-
-country.real.dat.gdp  <- country.real.dat
 
 ## because Greenland is a territory of Denmark, the gdp we would like
 ## to consider is the Danish GDP
