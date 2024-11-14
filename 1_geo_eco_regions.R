@@ -1,8 +1,12 @@
 rm(list=ls())
 library(tidyverse)
-library(rgdal)
-library(maptools)
+#library(rgdal) RETIRED!
+library(sf)
+#library(maptools)RETIRED!
 library(dplyr)
+library(countrycode)
+
+
 
 #read data
 
@@ -23,31 +27,27 @@ gdp <- read.csv("gdp.csv")
 biome.code <- read.csv("biome_codes.csv")
 countries <- read.csv("bees_by_country.csv")
 
-#fix issues in country names just to have them correct no longer used for matching data
-webs$Country[webs$Country == "puerto rico"] <- "usa"
-webs$Country[webs$Country == "hawaii"] <- "usa"
-webs$Country[webs$Country == "new zealand "] <- "new zealand"
-webs$Country[webs$Country == "moroco"] <- "morocco"
-webs$Country[webs$Country == "usa"] <- "united states"
-webs$Country[webs$Country == "uk"] <- "united kingdom"
-webs$Country[webs$Country == "england"] <- "united kingdom"
-webs$Country[webs$Country == "venezuela"] <- "venezuela, rb"
-webs$Country[webs$Country == "egypt"] <- "egypt, arab rep."
+
+# Standardize and validate country names
+webs$country_standardized <- countrycode(as.character(webs$Country), origin = "country.name", destination = "country.name")
+
+
+# Identify entries that were not matched to standard country names
+invalid_entries <- webs[is.na(webs$country_standardized), ]
+valid_data <- webs[!is.na(webs$country_standardized), ]
+
+# Output results
+print("Invalid entries:")
+print(invalid_entries)
 
 ## ## webs without countries, nothing we can do here
-sum(webs$Country == "")
-webs$Country[webs$Country == ""] <- NA
-webs$iso3[webs$ISO3 == ""] <- NA
-webs <- webs[!is.na(webs$Country),]
+webs <- webs %>% filter(!is.na(Country) & Country != "")
 
-#
+#count up the webs in each Country
 country.real.data <- webs %>%
   group_by(ISO3, Region)%>%
   summarise(webs = n())
 
-## count up the webs in each Country
-#country.real.dat <- table(webs$iso3)
-#sort(country.real.dat)
 
 ## ## all should have a country code now
 (country.real.data$ISO3)[!(country.real.data$ISO3) %in%
