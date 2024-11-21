@@ -95,8 +95,6 @@ dim(gdp)
 
 
 
-
-
 ## this is real data, there are no webs from these countries, so
 ## create 0 count data and add them to the data
 no.web.data <- rep(0, length(no.webs))
