@@ -159,9 +159,17 @@ save(gdp.web.dat,
 write.csv(webs, file="cleaned_web_data.csv",
           row.names=FALSE)
 
-layout(matrix(1:3, ncol=3))
-hist(log(gdp.web.dat$GDP.MEDIAN), main="GDP 20 year median", xlab="GDP in US dollars (log)",
-     ylab="Number of countries")
+
+
+# Open a new graphics device (if necessary)
+dev.new()
+
+# Set up layout with 1 row and 3 columns
+layout(matrix(1:3, ncol = 3))
+
+# Plot the histogram in the first position (1st of 3 columns)
+hist(log(gdp.web.dat$GDP.MEDIAN), main="GDP 20 year median", 
+     xlab="GDP in US dollars (log)", ylab="Number of countries")
 
 #high and low gdp values
 #USA
@@ -185,17 +193,18 @@ twty.yrs <- res.inv[, grep("2000",
 
 res.inv$PropGDP_median <- apply(twty.yrs, 1, median, na.rm=TRUE)
 
-res.inv <- merge(res.inv, gdp.20.yr.median, by="Country.Code")
+res.inv <- merge(res.inv, gdp.median, by="Country.Code")
 
 ## convert proportion to $$ by multiplying gdp and prop
 res.inv$ResInvestTotal <- res.inv$PropGDP_median*res.inv$GDP.MEDIAN
 
 ## no gdp
-res.inv$Country.Code[is.na(res.inv$GDP.MEDIAN)]
+print(res.inv$Country.Code[is.na(res.inv$GDP.MEDIAN)])
 
 ## drop NAs
+dim(res.inv)
 res.inv <- res.inv[!is.na(res.inv$ResInvestTotal),]
-
+dim(res.inv)
 ## high and low values of research investment
 ## USA
 res.inv$Country.Code[res.inv$ResInvestTotal ==
@@ -206,41 +215,41 @@ res.inv$Country.Code[res.inv$ResInvestTotal ==
                           min(res.inv$ResInvestTotal)]
 
 ## countries in the research $ data that we have in the studies dataset
-res.inv$Country.Code[res.inv$Country.Code %in%
-                     names(country.real.dat.gdp)]
+res.inv$Country.Code[res.inv$Country.Code %in% country.real.dat.gdp$Country.Code]
 
 ## research $ data but no web data
-res.inv$Country.Code[!res.inv$Country.Code %in%
-                     names(country.real.dat.gdp)]
-
 ## countries with res investment data but no webs
-no.webs <- res.inv$Country.Code[!res.inv$Country.Code %in%
-                            names(country.real.dat.gdp)]
-
+# Find Country Codes in res.inv that are NOT in country.real.dat.gdp
+no.webs <- res.inv$Country.Code[!res.inv$Country.Code %in% country.real.dat.gdp$Country.Code]
 no.webs
+
 ## since we already fixed this with gdp we are good
 
+#Countries with no research investments
+# Subset rows where Country.Code is not in res.inv, then extract Country.Code
+country.real.dat.res.inv <- country.real.dat.gdp[!country.real.dat.gdp$Country.Code %in% res.inv$Country.Code, ]
+country.real.dat.res.inv$Country.Code
+
 ## countries with no research investment data but webs
-no.res.inv <- names(country.real.dat.gdp)[!names(country.real.dat.gdp) %in%
-                            res.inv$Country.Code]
+# Subset rows where Country.Code is not in res.inv and webs > 0, then extract Country.Code
+no.res.inv <- country.real.dat.gdp[!country.real.dat.gdp$Country.Code 
+                                   %in% res.inv$Country.Code 
+                                   & country.real.dat.gdp$webs > 0, "Country.Code"]
 no.res.inv
 
-sort(country.real.dat.gdp[no.res.inv])
-
-#countries with no research investment
-country.real.dat.res.inv <-
-    country.real.dat.gdp[!names(country.real.dat.gdp) %in% no.res.inv]
 
 ## subset to country and research investment data
 res.inv.median <- res.inv[, c("Country.Code", "ResInvestTotal")]
 
 ## alphabetize names
-res.inv.median  <- res.inv.median[order(res.inv.median$Country.Code),]
+# Countries in gdp but not in country.real.dat.gdp
+missing_in_real <- setdiff(res.inv.median$Country.Code, country.real.dat.res.inv$Country.Code)
 
-country.real.dat.res.inv <- country.real.dat.res.inv[order(
-    names(country.real.dat.res.inv))]
+print(missing_in_real)
 
-names(country.real.dat.res.inv) == res.inv.median$Country.Code
+####
+#Stopping here... I think I broke something.
+
 ## (YAY) all match
 
 res.inv.web.dat <- data.frame(
