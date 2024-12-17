@@ -85,47 +85,51 @@ names(country.real.data)[!names(country.real.data) %in% gdp$Country.Name]
 
 ## **********************************************
 ## remove countries with NA gdp
+dim(gdp)
 gdp <- gdp[!is.na(gdp$'X2020'),]
+dim(gdp)
 
 ## countries with gdp data but no webs
-dim(gdp)
-no.webs <- gdp$Country.Code[!gdp$Country.Code %in%
-                            names(country.real.data)] #this does nothing
-dim(gdp)
-
-
+no.webs <- data.frame(ISO3 = gdp$Country.Code[!gdp$Country.Code %in% country.real.data$ISO3])
 
 ## this is real data, there are no webs from these countries, so
 ## create 0 count data and add them to the data
-no.web.data <- rep(0, length(no.webs))
-names(no.web.data)  <- no.webs
+no.webs$webs <- 0
 
-country.real.dat.gdp <- c(country.real.data, no.web.data)
+country.real.dat.gdp <- rbind(country.real.data, no.webs)
 
 ## match the countries in web data to gdp
 
 ## because Greenland is a territory of Denmark, the gdp we would like
 ## to consider is the Danish GDP
-names(country.real.dat.gdp)[names(country.real.dat.gdp) == "GRL"] <-
-    "DNK"
-
-country.real.dat.gdp <- tapply(country.real.dat.gdp,
-                               names(country.real.dat.gdp), sum)
-
-## double check
-gdp$Country.Code[!gdp$Country.Code %in% names(country.real.dat.gdp)]
-
-names(country.real.dat.gdp)[!names(country.real.dat.gdp) %in%
-                            gdp$Country.Code]
+country.real.dat.gdp[country.real.dat.gdp$ISO3 == "GRL",]$ISO3 <- "DNK"
 
 
-## we need to drop the webs from VEN and CUB because they don't report
-## GDP
+# Count occurrences of each unique code
+code_counts <- table(country.real.dat.gdp$ISO3)
 
-country.real.dat.gdp <-
-    country.real.dat.gdp[names(country.real.dat.gdp) %in%
-                         gdp$Country.Code]
+# Check if any code appears more than once
+if (any(code_counts > 1)) {
+  warning("Warning: One or more codes appear more than once!")
+} else {
+  print("All codes are unique.")
+}
 
+
+# Countries in gdp but not in country.real.dat.gdp
+missing_in_real <- setdiff(gdp$Country.Code, country.real.dat.gdp$ISO3)
+
+print(missing_in_real)
+
+# Countries in country.real.dat.gdp but not in gdp
+missing_in_gdp <- setdiff(country.real.dat.gdp$ISO3, gdp$Country.Code)
+
+print(missing_in_gdp)
+
+## we need to drop the webs that don't report GDP
+dim(country.real.dat.gdp)
+country.real.dat.gdp <- country.real.dat.gdp[country.real.dat.gdp$ISO3 != missing_in_gdp,]
+dim(country.real.dat.gdp)
 
 ## need the gdp to convert proportion to $$
 twty.yrs.gdp <- gdp[, grep("2000",
@@ -144,22 +148,18 @@ gdp <- merge(gdp, gdp.20.yr.median, by="Country.Code")
 gdp.median <- gdp[, c("Country.Code", "GDP.MEDIAN")]
 
 ## alphabetize names
-gdp.median  <- gdp.median[order(gdp.median$Country.Code),]
-
-country.real.dat.gdp <- country.real.dat.gdp[order(
-    names(country.real.dat.gdp))]
-
-names(country.real.dat.gdp) == gdp.median$Country.Code
+# gdp.median  <- gdp.median[order(gdp.median$Country.Code),]
+# 
+# country.real.dat.gdp <- country.real.dat.gdp[order(
+#     country.real.dat.gdp$ISO3),]
+# 
+# country.real.dat.gdp$ISO3 == gdp.median$Country.Code
 
 ## join gdp data and web count data
 
-gdp.web.dat <- data.frame(
-    "Country.Code" =names(country.real.dat.gdp),
-    "Web.count" = country.real.dat.gdp)
-rownames(gdp.web.dat) <- NULL
+names(country.real.dat.gdp)[names(country.real.dat.gdp) == "ISO3"] <- "Country.Code"
 
-gdp.web.dat  <- merge(gdp.web.dat,
-                      gdp.median)
+gdp.web.dat <- left_join(country.real.dat.gdp, gdp.median)
 
 head(gdp.web.dat)
 
