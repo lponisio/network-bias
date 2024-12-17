@@ -132,30 +132,18 @@ country.real.dat.gdp <- country.real.dat.gdp[country.real.dat.gdp$ISO3 != missin
 dim(country.real.dat.gdp)
 
 ## need the gdp to convert proportion to $$
-twty.yrs.gdp <- gdp[, grep("2000",
-                         colnames(gdp)):grep("2020",
-                                                 colnames(gdp))]
+# Select columns for the years 2000 to 2020 using the correct pattern
+year_columns <- grep("^X(200[0-9]|201[0-9]|2020)$", names(gdp))
 
-gdp.20.yr.median <- apply(twty.yrs.gdp, 1, median, na.rm=TRUE)
+# Calculate the row medians for those columns
+gdp$GDP.MEDIAN <- apply(gdp[, year_columns], 1, median, na.rm = TRUE)
 
-gdp.20.yr.median <- data.frame("GDP.MEDIAN"=gdp.20.yr.median,
-                               "Country.Code" =gdp$Country.Code)
-rownames(gdp.20.yr.median) <- NULL
-
-gdp <- merge(gdp, gdp.20.yr.median, by="Country.Code")
+# View the result
+head(gdp)
 
 ## subset to median
 gdp.median <- gdp[, c("Country.Code", "GDP.MEDIAN")]
 
-## alphabetize names
-# gdp.median  <- gdp.median[order(gdp.median$Country.Code),]
-# 
-# country.real.dat.gdp <- country.real.dat.gdp[order(
-#     country.real.dat.gdp$ISO3),]
-# 
-# country.real.dat.gdp$ISO3 == gdp.median$Country.Code
-
-## join gdp data and web count data
 
 names(country.real.dat.gdp)[names(country.real.dat.gdp) == "ISO3"] <- "Country.Code"
 
@@ -187,7 +175,6 @@ gdp$Country.Code[gdp.web.dat$GDP.MEDIAN == min(gdp.web.dat$GDP.MEDIAN)]
 ## research investment by country
 ## ***********************************************
 dim(res.inv)
-
 res.inv <- res.inv[!res.inv$Country.Code %in%  not.real.countries,]
 dim(res.inv)
 
@@ -196,18 +183,7 @@ twty.yrs <- res.inv[, grep("2000",
                          colnames(res.inv)):grep("2020",
                                                  colnames(res.inv))]
 
-## ## need the gdp to convert proportion to $$
-## twty.yrs.gdp <- gdp[, grep("2000",
-##                          colnames(gdp)):grep("2020",
-##                                                  colnames(gdp))]
-
 res.inv$PropGDP_median <- apply(twty.yrs, 1, median, na.rm=TRUE)
-
-## gdp.20.yr.median <- apply(twty.yrs.gdp, 1, median, na.rm=TRUE)
-
-## gdp.20.yr.median <- data.frame("gdp"=gdp.20.yr.median,
-##                                "Country.Code" =gdp$Country.Code)
-## rownames(gdp.20.yr.median) <- NULL
 
 res.inv <- merge(res.inv, gdp.20.yr.median, by="Country.Code")
 
