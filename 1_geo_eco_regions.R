@@ -388,53 +388,64 @@ webs$BiomeCode <- biome.code$BIOME[match(webs$Biome_WWF,
 ## drop codes that are for missing data
 biomes <- biomes[!biomes$BIOME %in% c(98,99),]
 
-## sum the area in each biome
-plot(biomes)
-southern <- biomes[biomes$geometry[,2] < 0,]
-northern <- biomes[coordinates(biomes)[,2] > 0,]
+
+# Ensure all geometries are valid
+biomes <- biomes %>%
+  mutate(geometry = st_make_valid(geometry))
+
+# Extract centroid latitudes for each geometry
+biomes <- biomes %>%
+  mutate(
+    hemisphere = ifelse(st_coordinates(st_centroid(geometry))[, 2] >= 0, 
+                        "Northern", 
+                        "Southern")
+  )
 
 
-n.area.biome <- tapply(northern@data$area_km2, northern@data$BIOME,
-                       sum)
-s.area.biome <- tapply(southern@data$area_km2, southern@data$BIOME,
-                       sum)
-globe.area.biome <-  tapply(biomes@data$area_km2, biomes@data$BIOME,
-                       sum)
+# Summarize the total area for each biome by hemisphere
+total_area_hemi_biomes <- biomes %>%
+  group_by(BIOME, hemisphere) %>%
+  summarise(total_area_km2 = sum(AREA, na.rm = TRUE)) %>%
+  ungroup() %>%
+  # Pivot the data to create separate columns for Northern and Southern
+  pivot_wider(names_from = hemisphere, values_from = total_area_km2, values_fill = list(total_area_km2 = 0))
 
-## southern hemisphere
-southern.webs <- webs[webs$LAT < 0,]
-northern.webs <- webs[webs$LAT > 0,]
+# Now, there will be one row per biome with columns for Northern and Southern hemisphere areas
+# Summarize the global area for each biome
+total_area_biomes <- biomes %>%
+  group_by(BIOME) %>%
+  summarise(global_area_km2 = sum(AREA, na.rm = TRUE)) %>%
+  ungroup()
 
-southern.real.dat <- table(southern.webs$BiomeCode)
-southern.real.dat <- c(southern.real.dat,
-                       "14"=0, "11"=0, "3"=0)
+# Convert both data frames to regular data frames (remove geometry)
+total_area_hemi_biomes <- total_area_hemi_biomes %>%
+  st_drop_geometry()
 
-southern.real.dat <-  southern.real.dat[
-    c("1", "2", "3", "4", "7", "8", "9",
-      "10", "11", "12", "13", "14")]
+total_area_biomes <- total_area_biomes %>%
+  st_drop_geometry()
 
-## check we have all the right catagories
-length(southern.real.dat) == length(s.area.biome)
-## check the order of names
-names(southern.real.dat) == names(s.area.biome)
+# Combine the hemisphere and global results into one data frame
+total_area_combined <- total_area_hemi_biomes %>%
+  left_join(total_area_biomes, by = "BIOME")
 
-## northern hemisphere
-northern.real.dat <- table(northern.webs$BiomeCode)
-global.real.dat <- table(webs$BiomeCode)
 
-northern.real.dat <- c(northern.real.dat,
-                       "9"=0)
+# Replace NA values with 0 for missing hemispheric areas
+total_area_combined <- total_area_combined %>%
+  mutate(across(c(Northern, Southern), ~replace_na(., 0)))
 
-northern.real.dat <-  northern.real.dat[
-    as.character(seq(1:14))]
+# View the result
+print(total_area_combined)
 
-## check we have all the right catagories
-length(northern.real.dat) == length(n.area.biome)
-## check the order of names
-names(northern.real.dat) == names(n.area.biome)
 
-biome.webs <- data.frame("GlobalArea"=globe.area.biome,
-                       "BiomeCode" = names(globe.area.biome))
+# Create the table for Southern Hemisphere, filling in any missing biomes that are a part of the area dataset and assign 0
+southern_real_dat <- table(factor(webs[webs$Hemisphere == "Southern", ]$BiomeCode, 
+                                  levels = total_area_hemi_biomes[total_area_hemi_biomes$hemisphere=="Southern",]$BIOME))
+
+northern_real_dat <- table(factor(webs[webs$Hemisphere == "Northern", ]$BiomeCode, 
+                                  levels = total_area_hemi_biomes[total_area_hemi_biomes$hemisphere=="Northern",]$BIOME))
+
+
+biome.webs <- as.data.frame(total_area_biomes[,1:2])
 
 biome.webs$NorthernArea <- n.area.biome[
     match(biome.webs$BiomeCode, names(n.area.biome))]
