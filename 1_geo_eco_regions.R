@@ -18,7 +18,7 @@ webs <- read.csv("raw/network_papers_2021_2.csv",  sep=";")
 res.inv <- read.csv("raw/research_expenditure.csv")
 gdp <- read.csv("raw/gdp.csv")
 biome.code <- read.csv("raw/biome_codes.csv")
-countries <- read.csv("raw/bees_by_country.csv")
+area.richness <- read.csv("raw/bees_by_country.csv")
 ## ***********************************************
 
 #dropping any rows with no country information
@@ -79,13 +79,6 @@ complete <- merge(country.real.data, country.real.data.country)
 
 complete <- merge(complete, webs)
 
-
-#countries <- countries[, c("NAME", "ISO3", "AREA", "CL_Species")]
-
-#Why save at this step?
-#save(webs, res.inv, gdp, biome.code, countries, country.real.data,
-#      file="../network-bias/data/rawdata.rdata")
-
 ## ***********************************************
 ## join the web data with the gdp data
 ## clean gdp data
@@ -102,8 +95,8 @@ not.real.countries <- c("WLD", "AFE", "AFW", "ARB", "CEB", "CSS", "EAP",
                         "NAC", "OED", "OSS", "PRE", "PSE", "PSS",
                         "PST",
                         "SAS", "SSA", "SSF", "SST", "TEA", "TEC",
-                        "TLA", "TMM", "TSA", "TSS", "UMC", "PRK"
-                        )
+                        "TLA", "TMM", "TSA", "TSS", "UMC", "PRK",
+                        "", "VAT")
 
 dim(gdp)
 gdp <- gdp[!gdp$Country.Code %in% not.real.countries,]
@@ -129,6 +122,9 @@ no.webs <- data.frame(iso3c = unique(gdp$Country.Code[!gdp$Country.Code %in% com
 
 ## this is real data, there are no webs from these countries, so
 ## create 0 count data and add them to the data
+## NA we count as true zeros. These are countries without GDP for usually
+## political reasons but are large areas with bees
+
 no.webs$webs_country <- 0
 
 no.webs$webs_country_region <- 0
@@ -212,7 +208,17 @@ year_columns <- grep("^X(200[0-9]|201[0-9]|2020)$", names(res.inv))
 
 res.inv$PropGDP_median <- apply(res.inv[, year_columns], 1, median, na.rm = TRUE)
 
-complete <- merge(res.inv[,c("Country.Code", "PropGDP_median")], complete, by="Country.Code")
+## research $ data but no web data officially collected
+## countries with res investment data but no webs
+no.res.inv <- res.inv$Country.Code[!res.inv$Country.Code %in% complete[complete$webs >0,]$Country.Code]
+no.res.inv
+
+#Countries with no research investments
+# Subset rows where Country.Code is not in res.inv, then extract Country.Code
+complete[!complete$Country.Code %in% res.inv$Country.Code, ]$Country.Code
+
+#merge gdp_median with complete df
+complete <- left_join(complete, res.inv[,c("Country.Code", "PropGDP_median")], by="Country.Code")
 
 ## convert proportion to $$ by multiplying gdp and prop
 complete$ResInvestTotal <- complete$PropGDP_median*complete$GDP.MEDIAN
@@ -225,7 +231,6 @@ dim(complete)
 complete <- complete[!is.na(complete$ResInvestTotal),]
 dim(complete)
 
-
 ## high and low values of research investment
 ## USA
 unique(complete$Country.Code[complete$ResInvestTotal == max(complete$ResInvestTotal)])
@@ -233,103 +238,25 @@ unique(complete$Country.Code[complete$ResInvestTotal == max(complete$ResInvestTo
 ## st. vincent and grenadines
 unique(complete$Country.Code[complete$ResInvestTotal == min(complete$ResInvestTotal)])
 
-
-
-#pausing here
-
-
-
-
-
-
-
-## research $ data but no web data officially collected
-## countries with res investment data but no webs
-no.res.inv <- res.inv$Country.Code[!res.inv$Country.Code %in% country.real.dat.gdp[country.real.dat.gdp$webs >0,]$Country.Code]
-no.res.inv
-
-#Countries with no research investments
-# Subset rows where Country.Code is not in res.inv, then extract Country.Code
-country.real.dat.gdp[!country.real.dat.gdp$Country.Code %in% res.inv$Country.Code, ]$Country.Code
-
-## countries with no research investment data but webs
-# Subset rows where Country.Code is not in res.inv and webs > 0, then extract Country.Code
-no.res.inv <- country.real.dat.gdp[!country.real.dat.gdp$Country.Code 
-                                   %in% res.inv$Country.Code 
-                                   & country.real.dat.gdp$webs > 0, "Country.Code"]
-no.res.inv
-
-#countries with research investment
-country.real.dat.res.inv <-
-  country.real.dat.gdp[!country.real.dat.gdp$Country.Code %in% no.res.inv$Country.Code,]
-
-#THIS SECTION MAKES NO SENSE TO ME
-# ######
-# #countries with research investment
-# country.real.dat.res.inv <-
-#   country.real.dat.gdp[!country.real.dat.gdp$Country.Code %in% no.res.inv$Country.Code,]
-# 
-# ## subset to country and research investment data
- res.inv.median <- res.inv[, c("Country.Code", "ResInvestTotal")]
-# 
-# ## alphabetize names
-# res.inv.median  <- res.inv.median[order(res.inv.median$Country.Code),]
-# 
-# country.real.dat.res.inv <- country.real.dat.res.inv[order(
-#   names(country.real.dat.res.inv))]
-# 
-# country.real.dat.res.inv$Country.Code %in% res.inv.median$Country.Code
-# ## (YAY) all match
-# 
-# res.inv.web.dat <- data.frame(
-#     "Country.Code" =country.real.dat.res.inv$Country.Code,
-#     "Web.count" = country.real.dat.res.inv$webs)
-# rownames(res.inv.web.dat) <- NULL
-
-res.inv.web.dat  <- merge(country.real.dat.res.inv, res.inv.median, by="Country.Code")
-head(res.inv.web.dat)
-
-hist(log(res.inv.web.dat$ResInvestTotal),
+hist(log(complete$ResInvestTotal),
      main="Research invenstment 20 year median", xlab="Investment in US dollars (log)",
      ylab="Number of countries")
 
-save(res.inv.web.dat,
-     file="raw/saved/res_inv_web_REGIONS.Rdata")
-
-# Calculate cumulative sum of webs and drop Region, replacing webs with cum_webs
-res.inv.web.dat.country <- res.inv.web.dat %>%
-  group_by(Country.Code) %>%
-  mutate(webs = cumsum(webs)) %>%
-  ungroup() %>%
-  select(-Region)  # Drop the Region column
-
-# View the updated dataset
-head(res.inv.web.dat.country)
-
-save(res.inv.web.dat.country,
-     file="raw/saved/res_inv_web_COUNTRY.Rdata")
 
 ## ***********************************************
 ## Area and bees' diversity by country
 ## ***********************************************
-
 ## VAT= vatican, FM= micronesia
-area.richness <- countries
 
-bad.countries <- c("", "VAT")
-area.richness <- area.richness[!area.richness$ISO3 %in%
-                       bad.countries,]
+area.richness <- area.richness[, c("NAME", "ISO3", "AREA", "CL_Species")]
+names(area.richness)[names(area.richness) == "ISO3"] <- "Country.Code"
 
-sort(unique(area.richness$NAME))
+area.richness <- area.richness[!area.richness$Country.Code %in% not.real.countries,]
 
-area.richness <- area.richness[, c("NAME", "ISO3",
-                                   "AREA", "CL_Species")]
-
-## in gdp
-length(area.richness[area.richness$ISO3 %in% gdp$Country.Code,]$ISO3)
-
-## not in gpd
-length(area.richness[!area.richness$ISO3 %in% gdp$Country.Code,]$ISO3)
+#counties with area richness in our data set
+length(area.richness[area.richness$Country.Code %in% unique(complete$Country.Code),]$Country.Code)
+#counties with area richness not in our data set
+length(area.richness[!area.richness$Country.Code %in% unique(complete$Country.Code),]$Country.Code)
 
 ## drop really small islands that are territories and would have been
 ## coded as part of the colonial empire
@@ -341,30 +268,15 @@ area.richness <-  area.richness[!is.na(area.richness$CL_Species),]
 
 ## drop islands off of Antarctica/ Madagascar because they are combined
 ## but each is less than 1000 km
-area.richness <-  area.richness[area.richness$ISO3 != "ATF",]
-area.richness <-  area.richness[area.richness$ISO3 != "MDG",]
-
+area.richness <-  area.richness[area.richness$Country.Code != "ATF",]
+area.richness <-  area.richness[area.richness$Country.Code != "MDG",]
 ## drop Western Sahara "disputed territory"
-area.richness <-  area.richness[area.richness$ISO3 != "ESH",]
-
-names(country.real.data.country)[names(country.real.data.country) == "iso3c"] <- "Country.Code"
-names(area.richness)[names(area.richness) == "ISO3"] <- "Country.Code"
+area.richness <-  area.richness[area.richness$Country.Code != "ESH",]
 
 ## merging networks and bee richness by country
-country.area.web.dat <- merge(country.real.data.country,
+country.area.web.dat <- left_join(complete,
                               area.richness,
-                              by = "Country.Code",
-                              all = F)
-
-## NA we count as true zeros. These are countries without GDP for usually
-## political reasons but are large areas with bees
-country.area.web.dat$webs[is.na(country.area.web.dat$webs)]  <- 0
-
-## no area data but yes gdp data
-country.area.web.dat[is.na(country.area.web.dat$NAME),]
-
-save(country.area.web.dat,
-     file="raw/saved/area_richness_web.Rdata")
+                              by = "Country.Code")
 
 ## ***********************************************
 ## Biomes
