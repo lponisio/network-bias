@@ -143,6 +143,11 @@ no.webs <- no.webs[, colnames(complete)]
 # Now use rbind to combine the rows
 complete <- rbind(complete, no.webs)
 
+#Assing contintents to countries with no webs
+complete$Continent <- countrycode(sourcevar = complete$iso3c, 
+                                      origin = "iso3c", 
+                                      destination = "continent")
+
 # Find countries in complete$iso3c but not in gdp$Country.Code
 missing_in_gdp <- setdiff(complete$iso3c, gdp$Country.Code)
 
@@ -169,7 +174,6 @@ head(gdp)
 names(complete)[names(complete) == "iso3c"] <- "Country.Code"
 
 complete <- left_join(complete, gdp[, c("Country.Code", "GDP.MEDIAN")], by = join_by(Country.Code))
-
 
 
 # Open a new graphics device
@@ -274,7 +278,7 @@ area.richness <-  area.richness[area.richness$Country.Code != "MDG",]
 area.richness <-  area.richness[area.richness$Country.Code != "ESH",]
 
 ## merging networks and bee richness by country
-country.area.web.dat <- left_join(complete, area.richness, by = "Country.Code")
+complete <- left_join(complete, area.richness, by = "Country.Code")
 
 ## ***********************************************
 ## Biomes
