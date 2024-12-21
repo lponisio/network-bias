@@ -274,9 +274,7 @@ area.richness <-  area.richness[area.richness$Country.Code != "MDG",]
 area.richness <-  area.richness[area.richness$Country.Code != "ESH",]
 
 ## merging networks and bee richness by country
-country.area.web.dat <- left_join(complete,
-                              area.richness,
-                              by = "Country.Code")
+country.area.web.dat <- left_join(complete, area.richness, by = "Country.Code")
 
 ## ***********************************************
 ## Biomes
@@ -286,7 +284,7 @@ country.area.web.dat <- left_join(complete,
 biomes <- st_read(dsn="official", layer="wwf_terr_ecos")
 # Standardize biome names (uppercase and remove commas)
 biome.code$BiomeName <- toupper(gsub(",", "", biome.code$BiomeName))
-webs$Biome_WWF <- toupper(gsub(",", "", webs$Biome_WWF))
+complete$Biome_WWF <- toupper(gsub(",", "", complete$Biome_WWF))
 
 # Correct biome name issues
 biome.code$BiomeName <- gsub("SCRUB", "SHRUB", biome.code$BiomeName)
@@ -294,18 +292,19 @@ biome.code$BiomeName <- gsub("TEMPERATE CONIFER FORESTS", "TEMPERATE CONIFEROUS 
 biome.code$BiomeName <- gsub("MANGROVES", "MANGROVE", biome.code$BiomeName)
 
 # Handle missing values in `Biome_WWF`
-webs$Biome_WWF[webs$Biome_WWF == "#N/A"] <- NA
+complete$Biome_WWF[complete$Biome_WWF == "#N/A"] <- NA
+
+
 
 # Find unmatched biome names
-unmatched_biomes <- setdiff(unique(webs$Biome_WWF), biome.code$BiomeName)
+unmatched_biomes <- setdiff(unique(complete$Biome_WWF), biome.code$BiomeName)
 unmatched_biomes
 
 # Match Biome_WWF to BiomeCode
-webs$BiomeCode <- biome.code$BIOME[match(webs$Biome_WWF, biome.code$BiomeName)]
+complete$BiomeCode <- biome.code$BIOME[match(complete$Biome_WWF, biome.code$BiomeName)]
 
-## sum the area for each biome in the S, N and the entire globe
 ## drop codes that are for missing data
-biomes <- biomes[!biomes$BIOME %in% c(98,99),]
+biomes <- biomes[biomes$BIOME %in% biome.code$BIOME,]
 
 # Ensure all geometries are valid
 biomes <- biomes %>%
@@ -317,7 +316,7 @@ biomes <- biomes %>%
     hemisphere = ifelse(st_coordinates(st_centroid(geometry))[, 2] >= 0, 
                         "Northern", 
                         "Southern")
-  )
+    )
 
 # Summarize the data
 biome_area_summary <- biomes %>%
@@ -326,10 +325,11 @@ biome_area_summary <- biomes %>%
     total_area_north = sum(AREA[hemisphere == "Northern"], na.rm = TRUE),
     total_area_south = sum(AREA[hemisphere == "Southern"], na.rm = TRUE),
     total_area_global = sum(AREA, na.rm = TRUE)
-  )
-
-biome_area_summary <- biome_area_summary %>%
+  )%>%
   st_drop_geometry()
+names(biome_area_summary)[names(biome_area_summary) == "BIOME"] <- "BiomeCode"
+
+complete <- left_join(complete, biome_area_summary,by ="BiomeCode")
 
 #these zeros were manually added in as part of the old pipeline
 #Is there a biologically relevant reason why this happened?
@@ -339,34 +339,18 @@ biome_area_summary <- biome_area_summary %>%
 # northern.real.dat <- c(northern.real.dat,
 #                        "9"=0)
 
-webs_biome <- webs %>%
+webs_biome <- complete %>%
   filter(!is.na(BiomeCode)) %>%  # Exclude rows with missing BiomeCode
   group_by(BiomeCode) %>%
   summarise(
     NorthernWebs = sum(Hemisphere == "Northern", na.rm = TRUE),
     SouthernWebs = sum(Hemisphere == "Southern", na.rm = TRUE),
     total_webs_global = n()
-  ) %>%
-  left_join(select(webs, BiomeCode, Biome_WWF)%>% distinct(), by = "BiomeCode")
+  ) 
 
-biome_area_summary <- merge(webs_biome, biome_area_summary)
+complete <-left_join(complete, webs_biome, by ="BiomeCode")
 
-save(biome_area_summary, global.real.dat, northern.real.dat, globe.area.biome,
-     file="raw/saved/biome_webs.Rdata")
+write.csv(complete, file = "raw/saved/webs_complete.csv")
 
 
-############
-#adding region variable
-
-gdp_area_species$Region <- webs$Region[match(
-  gdp_area_species$Country.Code,
-  webs$ISO3)]
-
-write.csv(gdp_area_species, file="raw/gdp_area_species_region.csv",
-          row.names=FALSE)
-
-gdp_area_species <- read.csv("gdp_area_species_region.csv",  sep=";")
-
-save(gdp_area_species,
-     file="../network-bias-saved/saved/gdp_area_species_region.rdata")
 
