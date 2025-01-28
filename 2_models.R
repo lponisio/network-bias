@@ -3,6 +3,7 @@ rm(list=ls())
 #workingdirectory
 source("~/lab_paths.R")
 local.path
+setwd(local.path)
 
 #packages
 library(performance)
@@ -11,11 +12,10 @@ library(dplyr)
 library(MASS)
 
 library(ggplot2)
-library(ggeffects)
+## library(ggeffects)
 library(viridis)
 #data
-webs_complete <- read.csv("~/University of Oregon Dropbox/Rose McDonald/network-bias-saved/raw/saved/webs_complete.csv")
-## ***********************************************
+webs_complete <- read.csv("network-bias-saved/raw/saved/webs_complete.csv")
 ## ***********************************************
 ## Biome models
 ## ***********************************************
@@ -24,45 +24,24 @@ webs_complete <- read.csv("~/University of Oregon Dropbox/Rose McDonald/network-
 #affects the number of webs and if the hemisphere
 #has an effect
 ## ***********************************************
-webs_biome<- webs_complete %>%
+webs_biome <- webs_complete %>%
   distinct(BiomeCode, .keep_all = TRUE) 
 
-#Poisson looks awful
-#honestly Gaussian looks really good too. 
-biome.area.mod <- MASS::glm.nb(total_webs_global ~ log(total_area_global),
-                      data=webs_biome)
-summary(biome.area.mod)
-performance::check_model(biome.area.mod)
+webs_complete <- webs_complete[!is.na(webs_complete$Hemisphere),]
+webs_complete <- webs_complete[!is.na(webs_complete$BiomeCode),]
+webs_complete$Key <- paste(webs_complete$Hemisphere,
+                           webs_complete$BiomeCode)
 
-## N hemiphere
-biome.area.mod.N <- glm(NorthernWebs ~ log(total_area_north),
-                        data=webs_biome, family="poisson")
+webs_biome <-  webs_complete[!duplicated(webs_complete$Key)]
 
-summary(biome.area.mod.N)
-check_model(biome.area.mod.N)
-
-
-## S hemisphere
-biome.area.mod.S <- glm(SouthernWebs ~ log(total_area_south+1),
-                        data=webs_biome)
-
-summary(biome.area.mod.S)
-check_model(biome.area.mod.S)
-
-#grouping a model with all biome data
-
-biome.net.m1 <- glm(total_webs_global ~ log(total_area_global) + Hemisphere,
-                    data = webs_biome,
-                    family = "poisson")
-summary(biome.net.m1)
-check_model(biome.net.m1)
-
+## THIS WAS THE FINAL MODEL
 # model with hemisphere interaction
 biome.net.m2 <- glm(total_webs_global ~ log(total_area_global) * Hemisphere,
                     data = webs_biome,
                     family = "poisson")
 summary(biome.net.m2)
-check_model(biome.net.m2)
+
+performance::check_model(biome.net.m2)
 
 ## ***********************************************
 
@@ -81,11 +60,9 @@ ggplot(webs_biome,
 ## ***********************************************
 ## GLMM Models #Struggling here
 ## ***********************************************
-webs_country<- webs_complete %>%
+webs_country <- webs_complete %>%
   distinct(Country.Code, .keep_all = TRUE) %>%
-  filter(!is.na(Continent),
-         !is.na(AREA),
-         !is.na(CL_Species))
+  filter(!is.na(CL_Species))
 
 webs_country <- webs_country[webs_country$Continent != "Oceania",]
 webs_country$Continent <- factor(webs_country$Continent,
@@ -93,13 +70,23 @@ webs_country$Continent <- factor(webs_country$Continent,
                                               "Africa",
                                               "Europe",
                                               "Asia"))
-webs_country$log_CL_Species <- log(webs_country$CL_Species + 1)  # Add a small constant (1)
+# Add a small constant (1)
+webs_country$log_CL_Species <- log(webs_country$CL_Species + 1)
 
+library(glmmTMB)
+library(car)
 
-country.mod_continent <- zim(webs_country ~ log(AREA) + log_CL_Species + Continent, 
-                             data = webs_country, 
-                             dist = "zinb")
-check_model(country.mod_continent)
+country.mod_continent <- glm(webs_country ~ scale(log(AREA)) +
+                                   scale(log_CL_Species) + Continent +
+                                scale(PropGDP_median),
+                                 data=webs_country,
+                                 ## ziformula = ~1,
+                                 family = "poisson")
+
+summary(country.mod_continent)
+vif(country.mod_continent)
+
+performance::check_model(country.mod_continent)
 
 # Residuals plot
 residuals <- residuals(country.mod_continent)
