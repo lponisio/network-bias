@@ -27,13 +27,18 @@ webs <-webs[!is.na(webs$Country),]
 dim(webs)
 
 # Standardize and validate country names
-webs$country_standardized <- countrycode(as.character(webs$Country), origin = "country.name", destination = "country.name")
-webs$iso3c <- countrycode(as.character(webs$country_standardized), origin = "country.name", destination = "iso3c")
+length(unique(webs$Country))
+webs$country_standardized <- countrycode(as.character(webs$Country), 
+                                         origin = "country.name", destination = "country.name")
+length(unique(webs$country_standardized))
 
+webs$iso3c <- countrycode(as.character(webs$country_standardized), 
+                          origin = "country.name", destination = "iso3c")
+length(unique(webs$iso3c))
 
 # Identify entries that were not matched to standard country names
 invalid_entries <- webs[is.na(webs$country_standardized), ]
-valid_data <- webs[!is.na(webs$country_standardized), ]
+#valid_data <- webs[!is.na(webs$country_standardized), ]
 
 # Output results
 print("Invalid entries:")
@@ -299,7 +304,6 @@ biome.code$BiomeName <- gsub("MANGROVES", "MANGROVE", biome.code$BiomeName)
 complete$Biome_WWF[complete$Biome_WWF == "#N/A"] <- NA
 
 
-
 # Find unmatched biome names
 unmatched_biomes <- setdiff(unique(complete$Biome_WWF), biome.code$BiomeName)
 unmatched_biomes
@@ -328,7 +332,7 @@ biome_area_summary <- biomes %>%
   summarize(
     total_area_north = sum(AREA[hemisphere == "Northern"], na.rm = TRUE),
     total_area_south = sum(AREA[hemisphere == "Southern"], na.rm = TRUE),
-    total_area_global = sum(AREA, na.rm = TRUE)
+    total_area_global = sum(AREA, na.rm = TRUE) #biome 
   )%>%
   st_drop_geometry()
 names(biome_area_summary)[names(biome_area_summary) == "BIOME"] <- "BiomeCode"
@@ -349,7 +353,7 @@ webs_biome <- complete %>%
   summarise(
     NorthernWebs = sum(Hemisphere == "Northern", na.rm = TRUE),
     SouthernWebs = sum(Hemisphere == "Southern", na.rm = TRUE),
-    total_webs_global = n()
+    total_webs_global = n() #change the name total_webs_wwfbiome
   ) 
 
 complete <-left_join(complete, webs_biome, by ="BiomeCode")
