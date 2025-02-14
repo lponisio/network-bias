@@ -11,7 +11,7 @@ source("network-bias/src/initailize.R")
 
 #columns to keep 
 col_keep <- c("Web_Code", "Use_Frequency", "Publi_Year","LAT", "LONG", "Region",
-              "Country", "ISO3", "Hemisphere", "Continent", "Biome_WWF")
+              "Country", "ISO3", "Continent", "Hemisphere","Biome_WWF")
 
 # Keep only the specified columns
 webs <- webs[, col_keep, drop = FALSE]
@@ -79,6 +79,13 @@ dim(gdp)
 gdp <- gdp[!is.na(gdp$'X2020'),]
 dim(gdp)
 
+
+# Handle missing values in `Biome_WWF`
+final$Biome_WWF[final$Biome_WWF == "#N/A"] <- NA
+final <- final[!is.na(final$Biome_WWF),]
+
+
+
 ## countries with gdp data but no webs
 no.webs <- data.frame(ISO3 = unique(gdp$Country.Code[!gdp$Country.Code %in% final$ISO3]))
 
@@ -112,6 +119,30 @@ final$Continent <- countrycode(sourcevar = final$ISO3,
 final[final$ISO3 == "TMN",]$Continent == "Asia"
 final[final$ISO3 == "XKX",]$Continent == "Europe"
 
+#assigning hemisphere to countries with no webs, therefore no assigned hemisphere
+#Get world map data
+world_map <- map_data("world")
+
+# Extract country names and latitudes
+latitudes <- world_map %>%
+  group_by(region) %>%
+  summarize(LAT = mean(lat, na.rm = TRUE))
+
+# Match country names to ISO3 codes
+latitudes$ISO3 <- countrycode(latitudes$region, origin = "country.name", destination = "iso3c")
+
+# Drop NA values (countries that couldn't be matched)
+latitudes <- latitudes[!is.na(latitudes$ISO3), ]
+
+# Merge with your dataset
+final <- left_join(final, latitudes, by = "ISO3")
+
+# Assign hemisphere
+final <- final %>%
+  mutate(Hemisphere = ifelse(is.na(Hemisphere), ifelse(LAT.y >= 0, "Northern", "Southern"), Hemisphere))
+
+# Check if any missing hemispheres remain
+sum(is.na(final$Hemisphere))
 
 # Find countries in complete$iso3c but not in gdp$Country.Code
 missing_in_gdp <- setdiff(final$ISO3, gdp$Country.Code)
@@ -276,37 +307,21 @@ biomes <- biomes %>%
                         "Southern")
     )
 
+
 # Summarize the data
 biome_area_summary <- biomes %>%
   group_by(BIOME) %>%
   summarize(
     AREA_biome_north = sum(AREA[hemisphere == "Northern"], na.rm = TRUE),
     AREA_biome_south = sum(AREA[hemisphere == "Southern"], na.rm = TRUE),
-    AREA_biome_total = sum(AREA, na.rm = TRUE) #biome 
+    AREA_biome_total = sum(AREA, na.rm = TRUE), #biome,
   )%>%
   st_drop_geometry()
+
+
 names(biome_area_summary)[names(biome_area_summary) == "BIOME"] <- "BiomeCode"
 
 final <- left_join(final, biome_area_summary,by ="BiomeCode")
-
-#these zeros were manually added in as part of the old pipeline
-#Is there a biologically relevant reason why this happened?
-#Some of these areas are not actually zero when I use a pipe to combine area
-# southern.real.dat <- c(southern.real.dat,
-#                        "14"=0, "11"=0, "3"=0)
-# northern.real.dat <- c(northern.real.dat,
-#                        "9"=0)
-
-webs_biome <- final %>%
-  filter(!is.na(BiomeCode)) %>%  # Exclude rows with missing BiomeCode
-  group_by(BiomeCode) %>%
-  summarise(
-    Total_webs_by_biome_Northern_Hemi = sum(Hemisphere == "Northern", na.rm = TRUE),
-    Total_webs_by_biome_Southern_Hemi = sum(Hemisphere == "Southern", na.rm = TRUE),
-    Total_webs_by_biome = n() #change the name total_webs_wwfbiome
-  ) 
-
-final <-left_join(final, webs_biome, by ="BiomeCode")
 
 write.csv(final, file = "raw/saved/webs_complete.csv")
 
