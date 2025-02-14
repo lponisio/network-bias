@@ -1,88 +1,55 @@
 rm(list=ls())
-library(tidyverse)
-#library(rgdal) RETIRED!
-library(sf)
-#library(maptools)RETIRED!
-library(dplyr)
-library(countrycode)
 
 ## ***********************************************
 source("~/lab_paths.R")
-local.path
+setwd(local.path)
+source("network-bias/src/initailize.R")
 
 ## ***********************************************
 ## General cleaning of web data
 ## ***********************************************
-setwd(paste0(local.path, "network-bias-saved/"))
-webs <- read.csv("raw/network_papers_2021_2.csv",  sep=";")
-res.inv <- read.csv("raw/research_expenditure.csv")
-gdp <- read.csv("raw/gdp.csv")
-biome.code <- read.csv("raw/biome_codes.csv")
-area.richness <- read.csv("raw/bees_by_country.csv")
-## ***********************************************
 
-#dropping any rows with no country information
-dim(webs)
-webs <-webs[!is.na(webs$Country),]
-dim(webs)
+#columns to keep 
+col_keep <- c("Web_Code", "Use_Frequency", "Publi_Year","LAT", "LONG", "Region",
+              "Country", "ISO3", "Hemisphere", "Continent", "Biome_WWF")
+
+# Keep only the specified columns
+webs <- webs[, col_keep, drop = FALSE]
 
 # Standardize and validate country names
 length(unique(webs$Country))
-webs$country_standardized <- countrycode(as.character(webs$Country), 
+
+webs$Country <- countrycode(as.character(webs$Country), 
                                          origin = "country.name", destination = "country.name")
-length(unique(webs$country_standardized))
+length(unique(webs$Country))
 
-webs$iso3c <- countrycode(as.character(webs$country_standardized), 
+#making sure the ISO3 is standardized
+webs$ISO3 <- countrycode(as.character(webs$Country), 
                           origin = "country.name", destination = "iso3c")
-length(unique(webs$iso3c))
-
-# Identify entries that were not matched to standard country names
-invalid_entries <- webs[is.na(webs$country_standardized), ]
-#valid_data <- webs[!is.na(webs$country_standardized), ]
-
-# Output results
-print("Invalid entries:")
-print(invalid_entries$iso3c)
 
 ## ## webs without countries, nothing we can do here
-webs <- webs %>% filter(!is.na(country_standardized) & country_standardized != "")
+dim(webs)
+webs <- webs %>% filter(!is.na(Country) & Country != "",
+                        !is.na(ISO3) & ISO3 != "")
+dim(webs)
 
+## ***********************************************
 #This was at a lower step in the pipeline but I moved it up to avoid errors
 ## because Greenland is a territory of Denmark, the gdp we would like
 ## to consider is the Danish GDP
-webs[webs$iso3c == "GRL",]$iso3c <- "DNK"
+webs[webs$ISO3 == "GRL",]$ISO3 <- "DNK"
 
+## ***********************************************
 #count up the webs in each Country
-country.real.data <- webs %>%
-  group_by(iso3c, Region)%>%
-  summarise(webs_country_region = n())
-
-
-# Count occurrences of each unique code by region
-code_counts <- table(country.real.data$iso3c, country.real.data$Region)
-
-# Check if any code appears more than once in each region
-region_check <- apply(code_counts, 2, function(x) any(x > 1))
-
-# Output warnings for regions where codes appear more than once
-if (any(region_check)) {
-  warning("Warning: One or more codes appear more than once in the following regions: ", 
-          paste(names(region_check)[region_check], collapse = ", "))
-} else {
-  print("All codes are unique within each region.")
-}
-
-
-country.real.data.country <- webs %>%
-  group_by(iso3c)%>%
-  summarise(webs_country = n())
+final <- webs %>%
+  group_by(ISO3)%>%
+  summarise(Total_webs_by_country = n())
 
 ## ## all should have a country code now
-(country.real.data$iso3c)[!(country.real.data$iso3c) %in% gdp$Country.Code]
+(final$ISO3)[!(final$ISO3) %in% gdp$Country.Code]
 
-complete <- merge(country.real.data, country.real.data.country)
-
-complete <- merge(complete, webs)
+#this is so you can just subset the original dataframe later on
+final <- merge(final, webs)
 
 ## ***********************************************
 ## join the web data with the gdp data
@@ -107,35 +74,23 @@ dim(gdp)
 gdp <- gdp[!gdp$Country.Code %in% not.real.countries,]
 dim(gdp)
 
-## **********************************************
-#######FROM HERE- what's the point of this
-
-## we don't want to modify the original data because we will join it
-## with other data later on with different missing country data
-
-## which countries in the data are not in the gdp
-complete[!complete$iso3c %in% gdp$Country.Code,]$iso3c
-
-## **********************************************
 ## remove countries with NA gdp
 dim(gdp)
 gdp <- gdp[!is.na(gdp$'X2020'),]
 dim(gdp)
 
 ## countries with gdp data but no webs
-no.webs <- data.frame(iso3c = unique(gdp$Country.Code[!gdp$Country.Code %in% complete$iso3c]))
+no.webs <- data.frame(ISO3 = unique(gdp$Country.Code[!gdp$Country.Code %in% final$ISO3]))
 
 ## this is real data, there are no webs from these countries, so
 ## create 0 count data and add them to the data
 ## NA we count as true zeros. These are countries without GDP for usually
 ## political reasons but are large areas with bees
+no.webs$Total_webs_by_country <- 0
 
-no.webs$webs_country <- 0
-
-no.webs$webs_country_region <- 0
 
 # Add missing columns to no.webs (fill with NA or a default value)
-missing_cols <- setdiff(colnames(complete), colnames(no.webs))
+missing_cols <- setdiff(colnames(final), colnames(no.webs))
 
 # Add these columns to no.webs with NA (or set a default value if needed)
 for (col in missing_cols) {
@@ -143,27 +98,33 @@ for (col in missing_cols) {
 }
 
 # Ensure the columns are in the same order
-no.webs <- no.webs[, colnames(complete)]
+no.webs <- no.webs[, colnames(final)]
 
 # Now use rbind to combine the rows
-complete <- rbind(complete, no.webs)
+final <- rbind(final, no.webs)
 
 #Assing contintents to countries with no webs
-complete$Continent <- countrycode(sourcevar = complete$iso3c, 
+final$Continent <- countrycode(sourcevar = final$ISO3, 
                                       origin = "iso3c", 
                                       destination = "continent")
 
+#it can't recgonize the continent for these
+final[final$ISO3 == "TMN",]$Continent == "Asia"
+final[final$ISO3 == "XKX",]$Continent == "Europe"
+
+
 # Find countries in complete$iso3c but not in gdp$Country.Code
-missing_in_gdp <- setdiff(complete$iso3c, gdp$Country.Code)
+missing_in_gdp <- setdiff(final$ISO3, gdp$Country.Code)
 
 # Print the missing countries
 print("Countries in complete but not in gdp:")
 print(missing_in_gdp)
 
 ## we need to drop the webs that don't report GDP
-dim(complete)
-complete <- complete[complete$iso3c != missing_in_gdp,]
-dim(complete)
+dim(final)
+final <- final[final$ISO3 != missing_in_gdp,]
+dim(final)
+
 
 ## need the gdp to convert proportion to $$
 # Select columns for the years 2000 to 2020 using the correct pattern
@@ -176,34 +137,17 @@ gdp$GDP.MEDIAN <- apply(gdp[, year_columns], 1, median, na.rm = TRUE)
 head(gdp)
 
 #rename iso3c column of df to help with merging
-names(complete)[names(complete) == "iso3c"] <- "Country.Code"
+names(gdp)[names(gdp) == "Country.Code"] <- "ISO3"
 
-complete <- left_join(complete, gdp[, c("Country.Code", "GDP.MEDIAN")], by = join_by(Country.Code))
-
-
-# Open a new graphics device
-dev.new()
-
-# Set up layout with 1 row and 3 columns
-layout(matrix(1, ncol = 1))
-
-# Filter out rows with missing or invalid Country.code
-filtered_data <- complete %>%
-  distinct(Country.Code,  .keep_all = TRUE)
-
-# Plot the histogram for each country based on Country.code
-hist(log(filtered_data$GDP.MEDIAN), 
-     main="GDP 20 year median", 
-     xlab="GDP in US dollars (log)", 
-     ylab="Number of countries")
+final <- left_join(final, gdp[, c("ISO3", "GDP.MEDIAN")], by = join_by(ISO3))
 
 #high and low gdp values
 #USA
-filtered_data$Country.Code[filtered_data$GDP.MEDIAN == max(filtered_data$GDP.MEDIAN)]
+unique(final$ISO3[final$GDP.MEDIAN == max(final$GDP.MEDIAN)])
 #TUV
-filtered_data$Country.Code[filtered_data$GDP.MEDIAN == min(filtered_data$GDP.MEDIAN)]
+unique(final$ISO3[final$GDP.MEDIAN == min(final$GDP.MEDIAN)])
 
-## (YAY)
+
 
 ## ***********************************************
 ## research investment by country
@@ -219,35 +163,40 @@ res.inv$PropGDP_median <- apply(res.inv[, year_columns], 1, median, na.rm = TRUE
 
 ## research $ data but no web data officially collected
 ## countries with res investment data but no webs
-no.res.inv <- res.inv$Country.Code[!res.inv$Country.Code %in% complete[complete$webs >0,]$Country.Code]
-no.res.inv
+res.inv.no.web <- res.inv$Country.Code[res.inv$Country.Code %in% 
+                                    final[final$Total_webs_by_country ==0,]$ISO3]
+res.inv.no.web
 
 #Countries with no research investments
 # Subset rows where Country.Code is not in res.inv, then extract Country.Code
-complete[!complete$Country.Code %in% res.inv$Country.Code, ]$Country.Code
+no.res.inv.web <- final$ISO3[!final$ISO3 %in% res.inv$Country.Code]
+res.inv.no.web
+
+#rename iso3c column of df to help with merging
+names(res.inv)[names(res.inv) == "Country.Code"] <- "ISO3"
 
 #merge gdp_median with complete df
-complete <- left_join(complete, res.inv[,c("Country.Code", "PropGDP_median")], by="Country.Code")
+final <- left_join(final, res.inv[,c("ISO3", "PropGDP_median")], by="ISO3")
 
 ## convert proportion to $$ by multiplying gdp and prop
-complete$ResInvestTotal <- complete$PropGDP_median*complete$GDP.MEDIAN
+final$ResInvestTotal <- final$PropGDP_median*final$GDP.MEDIAN
 
 ## no gdp
-print(unique(complete$Country.Code[is.na(complete$GDP.MEDIAN)]))
+print(unique(final$ISO3[is.na(final$GDP.MEDIAN)]))
 
 ## drop NAs DO WE WANT TO BE DOING THIS???
-dim(complete)
-complete <- complete[!is.na(complete$ResInvestTotal),]
-dim(complete)
+dim(final)
+final <- final[!is.na(final$ResInvestTotal),]
+dim(final)
 
 ## high and low values of research investment
 ## USA
-unique(complete$Country.Code[complete$ResInvestTotal == max(complete$ResInvestTotal)])
+unique(final$ISO3[final$ResInvestTotal == max(final$ResInvestTotal)])
 
 ## st. vincent and grenadines
-unique(complete$Country.Code[complete$ResInvestTotal == min(complete$ResInvestTotal)])
+unique(final$ISO3[final$ResInvestTotal == min(final$ResInvestTotal)])
 
-hist(log(complete$ResInvestTotal),
+hist(log(final$ResInvestTotal),
      main="Research invenstment 20 year median", xlab="Investment in US dollars (log)",
      ylab="Number of countries")
 
@@ -258,14 +207,18 @@ hist(log(complete$ResInvestTotal),
 ## VAT= vatican, FM= micronesia
 
 area.richness <- area.richness[, c("NAME", "ISO3", "AREA", "CL_Species")]
-names(area.richness)[names(area.richness) == "ISO3"] <- "Country.Code"
 
-area.richness <- area.richness[!area.richness$Country.Code %in% not.real.countries,]
+dim(area.richness)
+area.richness <- area.richness[!area.richness$ISO3 %in% not.real.countries,]
+dim(area.richness)
 
 #counties with area richness in our data set
-length(area.richness[area.richness$Country.Code %in% unique(complete$Country.Code),]$Country.Code)
+length(area.richness[area.richness$ISO3 %in% final$ISO3,]$ISO3)
+
 #counties with area richness not in our data set
-length(area.richness[!area.richness$Country.Code %in% unique(complete$Country.Code),]$Country.Code)
+length(area.richness[!area.richness$ISO3 %in% final$ISO3,]$ISO3)
+####DOUBLE CHECK
+#does dropping 99 make sense?
 
 ## drop really small islands that are territories and would have been
 ## coded as part of the colonial empire
@@ -277,23 +230,21 @@ area.richness <-  area.richness[!is.na(area.richness$CL_Species),]
 
 ## drop islands off of Antarctica/ Madagascar because they are combined
 ## but each is less than 1000 km
-area.richness <-  area.richness[area.richness$Country.Code != "ATF",]
-area.richness <-  area.richness[area.richness$Country.Code != "MDG",]
+area.richness <-  area.richness[area.richness$ISO3 != "ATF",]
+area.richness <-  area.richness[area.richness$ISO3 != "MDG",]
 ## drop Western Sahara "disputed territory"
-area.richness <-  area.richness[area.richness$Country.Code != "ESH",]
+area.richness <-  area.richness[area.richness$ISO3 != "ESH",]
 
 ## merging networks and bee richness by country
-complete <- left_join(complete, area.richness, by = "Country.Code")
+final <- left_join(final, area.richness, by = "ISO3")
 
 ## ***********************************************
 ## Biomes
 ## ***********************************************
 
-## load biome data
-biomes <- st_read(dsn="official", layer="wwf_terr_ecos")
 # Standardize biome names (uppercase and remove commas)
 biome.code$BiomeName <- toupper(gsub(",", "", biome.code$BiomeName))
-complete$Biome_WWF <- toupper(gsub(",", "", complete$Biome_WWF))
+final$Biome_WWF <- toupper(gsub(",", "", final$Biome_WWF))
 
 # Correct biome name issues
 biome.code$BiomeName <- gsub("SCRUB", "SHRUB", biome.code$BiomeName)
@@ -301,15 +252,14 @@ biome.code$BiomeName <- gsub("TEMPERATE CONIFER FORESTS", "TEMPERATE CONIFEROUS 
 biome.code$BiomeName <- gsub("MANGROVES", "MANGROVE", biome.code$BiomeName)
 
 # Handle missing values in `Biome_WWF`
-complete$Biome_WWF[complete$Biome_WWF == "#N/A"] <- NA
-
+final$Biome_WWF[final$Biome_WWF == "#N/A"] <- NA
 
 # Find unmatched biome names
-unmatched_biomes <- setdiff(unique(complete$Biome_WWF), biome.code$BiomeName)
+unmatched_biomes <- setdiff(unique(final$Biome_WWF), biome.code$BiomeName)
 unmatched_biomes
 
 # Match Biome_WWF to BiomeCode
-complete$BiomeCode <- biome.code$BIOME[match(complete$Biome_WWF, biome.code$BiomeName)]
+final$BiomeCode <- biome.code$BIOME[match(final$Biome_WWF, biome.code$BiomeName)]
 
 ## drop codes that are for missing data
 biomes <- biomes[biomes$BIOME %in% biome.code$BIOME,]
@@ -330,14 +280,14 @@ biomes <- biomes %>%
 biome_area_summary <- biomes %>%
   group_by(BIOME) %>%
   summarize(
-    total_area_north = sum(AREA[hemisphere == "Northern"], na.rm = TRUE),
-    total_area_south = sum(AREA[hemisphere == "Southern"], na.rm = TRUE),
-    total_area_global = sum(AREA, na.rm = TRUE) #biome 
+    AREA_biome_north = sum(AREA[hemisphere == "Northern"], na.rm = TRUE),
+    AREA_biome_south = sum(AREA[hemisphere == "Southern"], na.rm = TRUE),
+    AREA_biome_total = sum(AREA, na.rm = TRUE) #biome 
   )%>%
   st_drop_geometry()
 names(biome_area_summary)[names(biome_area_summary) == "BIOME"] <- "BiomeCode"
 
-complete <- left_join(complete, biome_area_summary,by ="BiomeCode")
+final <- left_join(final, biome_area_summary,by ="BiomeCode")
 
 #these zeros were manually added in as part of the old pipeline
 #Is there a biologically relevant reason why this happened?
@@ -347,18 +297,18 @@ complete <- left_join(complete, biome_area_summary,by ="BiomeCode")
 # northern.real.dat <- c(northern.real.dat,
 #                        "9"=0)
 
-webs_biome <- complete %>%
+webs_biome <- final %>%
   filter(!is.na(BiomeCode)) %>%  # Exclude rows with missing BiomeCode
   group_by(BiomeCode) %>%
   summarise(
-    NorthernWebs = sum(Hemisphere == "Northern", na.rm = TRUE),
-    SouthernWebs = sum(Hemisphere == "Southern", na.rm = TRUE),
-    total_webs_global = n() #change the name total_webs_wwfbiome
+    Total_webs_by_biome_Northern_Hemi = sum(Hemisphere == "Northern", na.rm = TRUE),
+    Total_webs_by_biome_Southern_Hemi = sum(Hemisphere == "Southern", na.rm = TRUE),
+    Total_webs_by_biome = n() #change the name total_webs_wwfbiome
   ) 
 
-complete <-left_join(complete, webs_biome, by ="BiomeCode")
+final <-left_join(final, webs_biome, by ="BiomeCode")
 
-write.csv(complete, file = "raw/saved/webs_complete.csv")
+write.csv(final, file = "raw/saved/webs_complete.csv")
 
 
 
