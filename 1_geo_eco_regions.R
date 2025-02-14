@@ -307,7 +307,6 @@ biomes <- biomes %>%
                         "Southern")
     )
 
-
 # Summarize the data
 biome_area_summary <- biomes %>%
   group_by(BIOME) %>%
@@ -322,6 +321,24 @@ biome_area_summary <- biomes %>%
 names(biome_area_summary)[names(biome_area_summary) == "BIOME"] <- "BiomeCode"
 
 final <- left_join(final, biome_area_summary,by ="BiomeCode")
+
+final <- final %>%
+  mutate(area_by_hemisphere = case_when(
+    Hemisphere == "Northern" ~ AREA_biome_north,
+    Hemisphere == "Southern" ~ AREA_biome_south,
+    TRUE ~ NA_real_  # Handle any unexpected cases
+  )) %>%
+  dplyr::select(-AREA_biome_north, -AREA_biome_south)
+
+# Summarize the data
+webs_biome_hemi <- final %>%
+  filter(BiomeCode != "NA")%>%
+  group_by(BiomeCode, Hemisphere) %>%
+  summarize(Total_webs_by_biome_hemi = sum(Total_webs_by_country)
+  )
+
+final <- left_join(final, webs_biome_hemi,by = c("BiomeCode", "Hemisphere"))
+
 
 write.csv(final, file = "raw/saved/webs_complete.csv")
 

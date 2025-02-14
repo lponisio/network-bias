@@ -24,16 +24,13 @@ webs_complete <- read.csv("network-bias-saved/raw/saved/webs_complete.csv")
 #affects the number of webs and if the hemisphere
 #has an effect
 ## ***********************************************
+#We only need total webs
 webs_biome <- webs_complete %>%
-  distinct(BiomeCode, .keep_all = TRUE) 
+  filter(BiomeCode != "NA")%>%
+  group_by(BiomeCode,Hemisphere )%>%
+  distinct(BiomeCode,Hemisphere, .keep_all = TRUE) 
 
-webs_complete <- webs_complete[!is.na(webs_complete$Hemisphere),]
-webs_complete <- webs_complete[!is.na(webs_complete$BiomeCode),]
-webs_complete$Key <- paste(webs_complete$Hemisphere,
-                           webs_complete$BiomeCode)
-
-webs_biome <-  webs_complete[!duplicated(webs_complete$Key)]
-
+#now i am confused how to fit this
 ## THIS WAS THE FINAL MODEL
 # model with hemisphere interaction
 biome.net.m2 <- glm(total_webs_global ~ log(total_area_global) * Hemisphere,
