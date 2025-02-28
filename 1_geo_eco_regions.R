@@ -334,7 +334,7 @@ final <- final %>%
 webs_biome_hemi <- final %>%
   filter(BiomeCode != "NA")%>%
   group_by(BiomeCode, Hemisphere) %>%
-  summarize(Total_webs_by_biome_hemi = sum(Total_webs_by_country)
+  summarize(Total_webs_by_biome_by_hemi = n()
   )
 
 final <- left_join(final, webs_biome_hemi,by = c("BiomeCode", "Hemisphere"))

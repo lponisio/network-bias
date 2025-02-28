@@ -24,16 +24,12 @@ webs_complete <- read.csv("network-bias-saved/raw/saved/webs_complete.csv")
 #affects the number of webs and if the hemisphere
 #has an effect
 ## ***********************************************
-#We only need total webs
+#we now have 
 webs_biome <- webs_complete %>%
   filter(BiomeCode != "NA")%>%
-  group_by(BiomeCode,Hemisphere )%>%
   distinct(BiomeCode,Hemisphere, .keep_all = TRUE) 
 
-#now i am confused how to fit this
-## THIS WAS THE FINAL MODEL
-# model with hemisphere interaction
-biome.net.m2 <- glm(total_webs_global ~ log(total_area_global) * Hemisphere,
+biome.net.m2 <- glm(Total_webs_by_biome_by_hemi ~ log(area_by_hemisphere) * Hemisphere,
                     data = webs_biome,
                     family = "poisson")
 summary(biome.net.m2)
@@ -42,10 +38,10 @@ performance::check_model(biome.net.m2)
 
 ## ***********************************************
 
-webs_biome$logArea <- log(webs_biome$total_area_global)
+webs_biome$logArea <- log(webs_biome$area_by_hemisphere)
 
 ggplot(webs_biome,
-       aes(x = logArea, y = total_webs_global, color = Hemisphere)) +
+       aes(x = logArea, y = Total_webs_by_biome_by_hemi, color = Hemisphere)) +
   geom_point() +
   scale_color_viridis(discrete = T) +
   geom_smooth(method = "glm", se = T,
@@ -58,7 +54,7 @@ ggplot(webs_biome,
 ## GLMM Models #Struggling here
 ## ***********************************************
 webs_country <- webs_complete %>%
-  distinct(Country.Code, .keep_all = TRUE) %>%
+  distinct(ISO3, .keep_all = TRUE) %>%
   filter(!is.na(CL_Species))
 
 webs_country <- webs_country[webs_country$Continent != "Oceania",]
@@ -73,7 +69,7 @@ webs_country$log_CL_Species <- log(webs_country$CL_Species + 1)
 library(glmmTMB)
 library(car)
 
-country.mod_continent <- glm(webs_country ~ scale(log(AREA)) +
+country.mod_continent <- glm(Total_webs_by_country ~ scale(log(AREA)) +
                                    scale(log_CL_Species) + Continent +
                                 scale(PropGDP_median),
                                  data=webs_country,
