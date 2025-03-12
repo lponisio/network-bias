@@ -132,9 +132,102 @@ plot(residuals)
 plot(predict(country.mod_continent), residuals)
 
 
+## ***********************************************
+#gonna put this in a function/source file later but I am trying to tidy up my 
+#latex table code to automatically populate results
 
 
 
+models <- list("Biome Model" = biome.net.m2, 
+               "Country Model" = country.mod_continent, 
+               "Webs Reuse Model" = webs_reuse_mod)
 
+# Extract and tidy the results
+model_results <- lapply(models, broom.mixed::tidy)
+
+# Define a function to standardize columns
+standardize_columns <- function(df, all_cols) {
+  df[setdiff(all_cols, names(df))] <- NA
+  df <- df[all_cols]
+  return(df)
+}
+
+# Get all unique column names across all data frames
+all_cols <- unique(unlist(lapply(model_results, names)))
+
+# Standardize columns for each model result
+standardized_results <- lapply(model_results, function(df) standardize_columns(df, all_cols))
+
+# Combine results
+combined_results <- do.call(rbind, lapply(names(standardized_results), function(name) {
+  results <- standardized_results[[name]]
+  results$model <- name
+  return(results)
+}))
+
+# Round all columns except p-values to 3 digits
+combined_results <- combined_results %>%
+  mutate(across(where(is.numeric) & !starts_with("p.value"), ~ round(., 2)))
+
+library(dplyr)
+colnames(combined_results) <- make.names(colnames(combined_results))
+
+# Select columns of interest
+results_table <- combined_results %>%
+  dplyr::select(model, term, estimate, std.error, statistic, p.value) %>%
+  mutate(p.value = format(p.value, scientific = TRUE, digits = 3))
+
+library(dplyr)
+library(glue)
+library(readr)
+
+
+# Function to format terms with p < 0.001 as bold
+format_term <- function(term, p_value) {
+  if (as.numeric(p_value) < 0.001) {
+    return(glue("\\textbf{{{term}}}"))
+  } else {
+    return(term)
+  }
+}
+
+# Generate LaTeX table
+latex_table <- glue(
+  "\\begin{{sidewaystable}}
+  \\centering
+  \\footnotesize
+  \\caption{{Parameter estimates and standard errors for the biome and country models. Terms with strong support ($p < 0.001$) are bolded.}}
+  \\label{{tab:results-models}}
+  \\resizebox{{0.9\\textwidth}}{{!}}{{
+  \\begin{{tabular}}{{|l|l|c|c|c|c|}}
+  \\hline
+  \\textbf{{Model}} & \\textbf{{Term}} & \\textbf{{Estimate}} & \\textbf{{Std. Error}} & \\textbf{{Statistic}} & \\textbf{{p-value}} \\\\
+  \\hline
+  {paste(
+    results_table %>%
+      mutate(term = mapply(format_term, term, p.value)) %>%
+      group_by(model) %>%
+      summarise(latex_rows = paste0(
+        " & ", term, 
+        " & ", estimate, 
+        " & ", std.error, 
+        " & ", statistic, 
+        " & ", p.value, " \\\\\n",
+        collapse = ""
+      ), .groups = "drop") %>%
+      mutate(latex_rows = paste0("\\multirow{", lengths(strsplit(latex_rows, "\n")), "}{*}{", model, "} ", latex_rows)),
+    collapse = "\\hline\n"
+  )}
+  \\hline
+  \\end{{tabular}}
+  }}
+  \\end{{sidewaystable}}"
+)
+
+# Save to file
+write_lines(latex_table, "results_table.tex")
+
+# Print LaTeX table
+cat(latex_table)
 
 

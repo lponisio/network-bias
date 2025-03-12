@@ -33,6 +33,7 @@ webs <- webs %>% filter(!is.na(Country) & Country != "",
                         !is.na(ISO3) & ISO3 != "")
 dim(webs)
 
+
 ## ***********************************************
 #This was at a lower step in the pipeline but I moved it up to avoid errors
 ## because Greenland is a territory of Denmark, the gdp we would like
@@ -79,12 +80,9 @@ dim(gdp)
 gdp <- gdp[!is.na(gdp$'X2020'),]
 dim(gdp)
 
-
 # Handle missing values in `Biome_WWF`
 final$Biome_WWF[final$Biome_WWF == "#N/A"] <- NA
 final <- final[!is.na(final$Biome_WWF),]
-
-
 
 ## countries with gdp data but no webs
 no.webs <- data.frame(ISO3 = unique(gdp$Country.Code[!gdp$Country.Code %in% final$ISO3]))
@@ -94,7 +92,6 @@ no.webs <- data.frame(ISO3 = unique(gdp$Country.Code[!gdp$Country.Code %in% fina
 ## NA we count as true zeros. These are countries without GDP for usually
 ## political reasons but are large areas with bees
 no.webs$Total_webs_by_country <- 0
-
 
 # Add missing columns to no.webs (fill with NA or a default value)
 missing_cols <- setdiff(colnames(final), colnames(no.webs))
@@ -110,7 +107,8 @@ no.webs <- no.webs[, colnames(final)]
 # Now use rbind to combine the rows
 final <- rbind(final, no.webs)
 
-#Assing contintents to countries with no webs
+## ***********************************************
+#Assing contintents to countries where the data is missing
 final$Continent <- countrycode(sourcevar = final$ISO3, 
                                       origin = "iso3c", 
                                       destination = "continent")
@@ -119,6 +117,7 @@ final$Continent <- countrycode(sourcevar = final$ISO3,
 final[final$ISO3 == "TMN",]$Continent == "Asia"
 final[final$ISO3 == "XKX",]$Continent == "Europe"
 
+## ***********************************************
 #assigning hemisphere to countries with no webs, therefore no assigned hemisphere
 #Get world map data
 world_map <- map_data("world")
@@ -137,6 +136,7 @@ latitudes <- latitudes[!is.na(latitudes$ISO3), ]
 # Merge with your dataset
 final <- left_join(final, latitudes, by = "ISO3")
 
+## ***********************************************
 # Assign hemisphere
 final <- final %>%
   mutate(Hemisphere = ifelse(is.na(Hemisphere), ifelse(LAT.y >= 0, "Northern", "Southern"), Hemisphere))
@@ -144,6 +144,16 @@ final <- final %>%
 # Check if any missing hemispheres remain
 sum(is.na(final$Hemisphere))
 
+## ***********************************************
+#Assigning north and south america 
+final1 <- final %>%
+  mutate(Continent = ifelse(Continent == "Americas" & Hemisphere == "Northern", 
+                            "Northern America", 
+                            ifelse(Continent == "Americas" & Hemisphere == "Southern", 
+                                   "Southern America", 
+                                   Continent)))
+
+## ***********************************************
 # Find countries in complete$iso3c but not in gdp$Country.Code
 missing_in_gdp <- setdiff(final$ISO3, gdp$Country.Code)
 
@@ -178,13 +188,11 @@ unique(final$ISO3[final$GDP.MEDIAN == max(final$GDP.MEDIAN)])
 #TUV
 unique(final$ISO3[final$GDP.MEDIAN == min(final$GDP.MEDIAN)])
 
-
-
 ## ***********************************************
 ## research investment by country
 ## ***********************************************
 dim(res.inv)
-res.inv <- res.inv[!res.inv$Country.Code %in%  not.real.countries,]
+res.inv <- res.inv[!res.inv$Country.Code %in% not.real.countries,]
 dim(res.inv)
 
 ## take the 20 year median
@@ -236,7 +244,6 @@ hist(log(final$ResInvestTotal),
 ## Area and bees' diversity by country
 ## ***********************************************
 ## VAT= vatican, FM= micronesia
-
 area.richness <- area.richness[, c("NAME", "ISO3", "AREA", "CL_Species")]
 
 dim(area.richness)
@@ -247,7 +254,7 @@ dim(area.richness)
 length(area.richness[area.richness$ISO3 %in% final$ISO3,]$ISO3)
 
 #counties with area richness not in our data set
-length(area.richness[!area.richness$ISO3 %in% final$ISO3,]$ISO3)
+length(unique(area.richness[!area.richness$ISO3 %in% final$ISO3,]$ISO3))
 ####DOUBLE CHECK
 #does dropping 99 make sense?
 
@@ -339,7 +346,14 @@ webs_biome_hemi <- final %>%
 
 final <- left_join(final, webs_biome_hemi,by = c("BiomeCode", "Hemisphere"))
 
+## ***********************************************
+## Years since published
+## ***********************************************
+final <- final %>%
+  mutate(years_since_pub = as.numeric(format(Sys.Date(), "%Y")) - Publi_Year)
 
+
+## ***********************************************
 write.csv(final, file = "raw/saved/webs_complete.csv")
 
 
