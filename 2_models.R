@@ -22,11 +22,6 @@ savefilepath <- c("network-bias-saved/manuscript/figures")
 ## ***********************************************
 ## Biome models
 ## ***********************************************
-#For these models we are evaluating the total webs
-#per biome. We are investigating how area of the biome
-#affects the number of webs and if the hemisphere
-#has an effect
-## ***********************************************
 ## from manuscript currently
 # To test whether network collection is related to the biome area in the Northern 
 # and Southern hemispheres, we included the number of networks by country as a 
@@ -46,21 +41,6 @@ biome.net.m2 <- glm(Total_webs_by_country ~ log(AREA_biome_total) * Hemisphere,
 summary(biome.net.m2)
 
 performance::check_model(biome.net.m2)
-
-## ***********************************************
-
-webs_bycounty$logArea <- log(webs_bycounty$AREA_biome_total)
-webs_bycounty$logNetworksCountry <- log(webs_bycounty$Total_webs_by_country)
-
-ggplot(webs_bycounty,
-       aes(x = logArea, y = logNetworksCountry, color = Hemisphere)) +
-  geom_point() +
-  scale_color_viridis(discrete = T) +
-  geom_smooth(method = "glm", se = T,
-              method.args = list(family = "poisson")) +
-  labs(x="Area per biome (log)", y="Networks") +
-  theme_classic()
-
 
 ## ***********************************************
 ## country-level variables
@@ -118,44 +98,6 @@ plot(residuals)
 
 # Predicted vs. residuals
 plot(predict(country.mod_continent), residuals)
-
-## ***********************************************
-webs_country$logNetworksCountry <- log(webs_country$Total_webs_by_country)
-
-#area of country by networks
-area <- ggplot(webs_country,
-       aes(x = log(AREA), y = logNetworksCountry, color = Continent)) +
-  geom_point() +
-  scale_color_viridis(discrete = T) +
-  geom_smooth(method = "glm", se = T,
-              method.args = list(family = "poisson")) +
-  labs(x="Country Area (log)", y="Networks (log)") +
-  theme_classic()
-
-#research invs by networks
-res_inv <- ggplot(webs_country,
-       aes(x = PropGDP_median, y = logNetworksCountry, color = Continent)) +
-  geom_point() +
-  scale_color_viridis(discrete = T) +
-  geom_smooth(method = "glm", se = T,
-              method.args = list(family = "poisson")) +
-  labs(x="Research Investment (PropGDP_median)", y="Networks (log)") +
-  theme_classic()
-
-#Bee species
-bees <- ggplot(webs_country,
-       aes(x = log_CL_Species, y = logNetworksCountry, color = Continent)) +
-  geom_point() +
-  scale_color_viridis(discrete = T) +
-  geom_smooth(method = "glm", se = T,
-              method.args = list(family = "poisson")) +
-  labs(x="Bee Species (log)", y="Networks (log)") +
-  theme_classic()
-
-# Arrange plots
-combined_plot <- plot_grid(area, res_inv, bees, ncol = 1,labels="AUTO")
-
-ggsave(combined_plot, file = paste0(savefilepath, "/combined_plot.jpg"), height = 10, width = 10)
 
 ## ***********************************************
 ## network re-use
