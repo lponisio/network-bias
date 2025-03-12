@@ -168,5 +168,31 @@ ggsave(combined_plot, file = paste0(savefilepath, "/combined_plot.jpg"), height 
 # published and the country as explanatory variables. Similar to the second model, 
 # we included continent as a random effect. 
 ## ***********************************************
+webs_reuse <- webs_complete %>%
+  distinct(Web_Code, .keep_all = TRUE) %>%
+  mutate(years_since_pub = as.numeric(format(Sys.Date(), "%Y")) - Publi_Year)
+
+#ARG is the intercept :)
+webs_reuse_mod <- glm(Use_Frequency ~ ISO3 +years_since_pub,
+                             data=webs_reuse,
+                             ## ziformula = ~1,
+                             family = "poisson")
+
+summary(country.mod_continent)
+
+performance::check_model(country.mod_continent)
+
+
+# Residuals plot
+residuals <- residuals(country.mod_continent)
+plot(residuals)
+# Predicted vs. residuals
+plot(predict(country.mod_continent), residuals)
+
+
+
+
+
+
 
 
