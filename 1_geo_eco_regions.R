@@ -146,7 +146,7 @@ sum(is.na(final$Hemisphere))
 
 ## ***********************************************
 #Assigning north and south america 
-final1 <- final %>%
+final <- final %>%
   mutate(Continent = ifelse(Continent == "Americas" & Hemisphere == "Northern", 
                             "Northern America", 
                             ifelse(Continent == "Americas" & Hemisphere == "Southern", 
@@ -354,7 +354,7 @@ final <- final %>%
 
 
 ## ***********************************************
-write.csv(final, file = "raw/saved/webs_complete.csv")
+write.csv(final, file = "saved/webs_complete.csv")
 
 
 

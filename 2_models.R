@@ -15,7 +15,7 @@ library(ggplot2)
 ## library(ggeffects)
 library(viridis)
 #data
-webs_complete <- read.csv("network-bias-saved/raw/saved/webs_complete.csv")
+webs_complete <- read.csv("network-bias-saved/saved/webs_complete.csv")
 
 savefilepath <- c("network-bias-saved/manuscript/figures")
 
@@ -190,8 +190,9 @@ format_term <- function(term, p_value) {
     return(term)
   }
 }
+library(glue)
+library(dplyr)
 
-# Generate LaTeX table
 latex_table <- glue(
   "\\begin{{sidewaystable}}
   \\centering
@@ -203,26 +204,27 @@ latex_table <- glue(
   \\hline
   \\textbf{{Model}} & \\textbf{{Term}} & \\textbf{{Estimate}} & \\textbf{{Std. Error}} & \\textbf{{Statistic}} & \\textbf{{p-value}} \\\\
   \\hline
-  {paste(
-    results_table %>%
-      mutate(term = mapply(format_term, term, p.value)) %>%
-      group_by(model) %>%
-      summarise(latex_rows = paste0(
-        " & ", term, 
-        " & ", estimate, 
-        " & ", std.error, 
-        " & ", statistic, 
-        " & ", p.value, " \\\\\n",
-        collapse = ""
-      ), .groups = "drop") %>%
-      mutate(latex_rows = paste0("\\multirow{", lengths(strsplit(latex_rows, "\n")), "}{*}{", model, "} ", latex_rows)),
-    collapse = "\\hline\n"
-  )}
+  {results_table %>%
+    mutate(term = mapply(format_term, term, p.value)) %>%
+    group_by(model) %>%
+    summarise(latex_rows = paste0(
+      model, " & ", term, 
+      " & ", estimate, 
+      " & ", std.error, 
+      " & ", statistic, 
+      " & ", p.value, "\\\\"
+    )) %>%
+    pull(latex_rows) %>%
+    paste(collapse = "\n")
+  }
   \\hline
   \\end{{tabular}}
   }}
   \\end{{sidewaystable}}"
 )
+
+cat(latex_table)  # Print to verify output
+
 
 # Save to file
 write_lines(latex_table, "results_table.tex")
