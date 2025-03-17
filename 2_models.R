@@ -5,20 +5,7 @@ source("~/lab_paths.R")
 local.path
 setwd(local.path)
 
-#packages
-library(performance)
-library(lme4)
-library(dplyr)
-library(MASS)
-library(cowplot)
-library(ggplot2)
-## library(ggeffects)
-library(viridis)
-#data
-webs_complete <- read.csv("network-bias-saved/saved/webs_complete.csv")
-
-savefilepath <- c("network-bias-saved/manuscript/figures")
-
+source("network-bias/src/initalize_models.R")
 ## ***********************************************
 ## Biome models
 ## ***********************************************
@@ -80,10 +67,11 @@ webs_country$log_CL_Species <- log(webs_country$CL_Species + 1)
 library(glmmTMB)
 library(car)
 
-country.mod_continent <- glm(Total_webs_by_country ~ scale(log(AREA)) +
-                                   scale(log_CL_Species) + Continent +
-                                scale(PropGDP_median),
-                                 data=webs_country,
+country.mod_continent <- glm(Total_webs_by_country ~ Continent +
+                                    scale(log(AREA)) +
+                                  scale(PropGDP_median)+
+                                   scale(log_CL_Species), 
+                                  data=webs_country,
                                  ## ziformula = ~1,
                                  family = "poisson")
 
@@ -120,16 +108,10 @@ webs_reuse_mod <- glm(Use_Frequency ~ ISO3 +years_since_pub,
                              ## ziformula = ~1,
                              family = "poisson")
 
-summary(country.mod_continent)
+summary(webs_reuse_mod)
 
-performance::check_model(country.mod_continent)
+performance::check_model(webs_reuse_mod)
 
-
-# Residuals plot
-residuals <- residuals(country.mod_continent)
-plot(residuals)
-# Predicted vs. residuals
-plot(predict(country.mod_continent), residuals)
 
 
 ## ***********************************************
@@ -137,99 +119,21 @@ plot(predict(country.mod_continent), residuals)
 #latex table code to automatically populate results
 
 
-
-models <- list("Biome Model" = biome.net.m2, 
-               "Country Model" = country.mod_continent, 
-               "Webs Reuse Model" = webs_reuse_mod)
-
-# Extract and tidy the results
-model_results <- lapply(models, broom.mixed::tidy)
-
-# Define a function to standardize columns
-standardize_columns <- function(df, all_cols) {
-  df[setdiff(all_cols, names(df))] <- NA
-  df <- df[all_cols]
-  return(df)
-}
-
-# Get all unique column names across all data frames
-all_cols <- unique(unlist(lapply(model_results, names)))
-
-# Standardize columns for each model result
-standardized_results <- lapply(model_results, function(df) standardize_columns(df, all_cols))
-
-# Combine results
-combined_results <- do.call(rbind, lapply(names(standardized_results), function(name) {
-  results <- standardized_results[[name]]
-  results$model <- name
-  return(results)
-}))
-
-# Round all columns except p-values to 3 digits
-combined_results <- combined_results %>%
-  mutate(across(where(is.numeric) & !starts_with("p.value"), ~ round(., 2)))
-
-library(dplyr)
-colnames(combined_results) <- make.names(colnames(combined_results))
-
-# Select columns of interest
-results_table <- combined_results %>%
-  dplyr::select(model, term, estimate, std.error, statistic, p.value) %>%
-  mutate(p.value = format(p.value, scientific = TRUE, digits = 3))
-
-library(dplyr)
-library(glue)
-library(readr)
-
-
-# Function to format terms with p < 0.001 as bold
-format_term <- function(term, p_value) {
-  if (as.numeric(p_value) < 0.001) {
-    return(glue("\\textbf{{{term}}}"))
-  } else {
-    return(term)
-  }
-}
-library(glue)
-library(dplyr)
-
-latex_table <- glue(
-  "\\begin{{sidewaystable}}
-  \\centering
-  \\footnotesize
-  \\caption{{Parameter estimates and standard errors for the biome and country models. Terms with strong support ($p < 0.001$) are bolded.}}
-  \\label{{tab:results-models}}
-  \\resizebox{{0.9\\textwidth}}{{!}}{{
-  \\begin{{tabular}}{{|l|l|c|c|c|c|}}
-  \\hline
-  \\textbf{{Model}} & \\textbf{{Term}} & \\textbf{{Estimate}} & \\textbf{{Std. Error}} & \\textbf{{Statistic}} & \\textbf{{p-value}} \\\\
-  \\hline
-  {results_table %>%
-    mutate(term = mapply(format_term, term, p.value)) %>%
-    group_by(model) %>%
-    summarise(latex_rows = paste0(
-      model, " & ", term, 
-      " & ", estimate, 
-      " & ", std.error, 
-      " & ", statistic, 
-      " & ", p.value, "\\\\"
-    )) %>%
-    pull(latex_rows) %>%
-    paste(collapse = "\n")
-  }
-  \\hline
-  \\end{{tabular}}
-  }}
-  \\end{{sidewaystable}}"
+table_biome <- format_glm_table(
+  biome.net.m2,
+  caption = "biome.net.m2"
 )
 
-cat(latex_table)  # Print to verify output
+table_country <- format_glm_table(
+  country.mod_continent,
+  caption = "country.mod_continent"
+)
+
+table_reuse <- format_glm_table(
+  webs_reuse_mod,
+  caption = "webs_reuse_mod"
+)
 
 
-# Save to file
-write_lines(latex_table, "results_table.tex")
-
-# Print LaTeX table
-cat(latex_table)
 
 
