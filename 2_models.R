@@ -6,28 +6,6 @@ local.path
 setwd(local.path)
 
 source("network-bias/src/initalize_models.R")
-## ***********************************************
-## Biome models
-## ***********************************************
-## from manuscript currently
-# To test whether network collection is related to the biome area in the Northern 
-# and Southern hemispheres, we included the number of networks by country as a 
-# response variable and the biome area as an explanatory variable in a generalized 
-# linear model (GLM).  We included an interaction between biome area and Northern 
-# vs. Southern hemispehere to allow the accumulation of network with are to vary 
-# by hemisphere. 
-## ***********************************************
-#we now have 
-webs_bycounty <- webs_complete %>%
-  filter(BiomeCode != "NA")%>%
-  distinct(ISO3, .keep_all = TRUE) 
-
-biome.net.m2 <- glm(Total_webs_by_country ~ log(AREA_biome_total) * Hemisphere,
-                    data = webs_bycounty,
-                    family = "poisson")
-summary(biome.net.m2)
-
-performance::check_model(biome.net.m2)
 
 ## ***********************************************
 ## country-level variables
@@ -46,14 +24,6 @@ webs_country <- webs_complete %>%
 
 webs_country <- webs_country[webs_country$Continent != "Oceania",]
 
-#Idk if we want this? can update in cleaning pipeline if so
-webs_country <- webs_country %>%
-  mutate(Continent = ifelse(Continent == "Americas" & Hemisphere == "Northern", 
-                            "Northern America", 
-                            ifelse(Continent == "Americas" & Hemisphere == "Southern", 
-                                   "Southern America", 
-                                   Continent)))
-
 webs_country$Continent <- factor(webs_country$Continent,
                                      levels=c("Northern America",
                                               "Southern America",
@@ -61,31 +31,38 @@ webs_country$Continent <- factor(webs_country$Continent,
                                               "Europe",
                                               "Asia"))
 
-# Add a small constant (1)
-webs_country$log_CL_Species <- log(webs_country$CL_Species + 1)
+#negative binomial
+country.mod.two <- glm.nb(Total_webs_by_country ~ Continent +
+                                  scale(log(AREA)) +
+                                  scale(log(PropGDP_median)) +
+                                  scale(log(CL_Species)),
+                                data = webs_country)
+performance::check_model(country.mod.two)
+#https://cran.r-project.org/web/packages/DHARMa/vignettes/DHARMa.html
+sim_res <- simulateResiduals(country.mod.two)
+plot(sim_res)  
 
-library(glmmTMB)
-library(car)
+summary(country.mod.two)
 
-country.mod_continent <- glm(Total_webs_by_country ~ Continent +
-                                    scale(log(AREA)) +
-                                  scale(PropGDP_median)+
-                                   scale(log_CL_Species), 
-                                  data=webs_country,
-                                 ## ziformula = ~1,
-                                 family = "poisson")
-
-summary(country.mod_continent)
-vif(country.mod_continent)
-
-performance::check_model(country.mod_continent)
-
-# Residuals plot
-residuals <- residuals(country.mod_continent)
-plot(residuals)
-
-# Predicted vs. residuals
-plot(predict(country.mod_continent), residuals)
+# # Fit zero-inflated negative binomial model
+# country.mod.zi <- glmmTMB(
+#   Total_webs_by_country ~ Continent +
+#     scale(log(AREA)) +
+#     scale(log(PropGDP_median)) +
+#     scale(log(CL_Species)),      
+#   ziformula = ~ 1,          
+#   family = nbinom2,                 
+#   data = webs_country
+# )
+# 
+# # Check model diagnostics
+# performance::check_model(country.mod.zi)
+# # Simulate residuals and plot diagnostics
+# sim_res_zi <- simulateResiduals(country.mod.zi)
+# plot(sim_res_zi)
+# 
+# # Summarize the model
+# summary(country.mod.zi)
 
 ## ***********************************************
 ## network re-use
@@ -137,3 +114,31 @@ table_reuse <- format_glm_table(
 
 
 
+## ***********************************************
+#We are no longer analyzing biome because all the other metrics are at the country
+#level
+## ***********************************************
+
+
+## ***********************************************
+## Biome models
+## ***********************************************
+## from manuscript currently
+# To test whether network collection is related to the biome area in the Northern 
+# and Southern hemispheres, we included the number of networks by country as a 
+# response variable and the biome area as an explanatory variable in a generalized 
+# linear model (GLM).  We included an interaction between biome area and Northern 
+# vs. Southern hemispehere to allow the accumulation of network with are to vary 
+# by hemisphere. 
+## ***********************************************
+#we now have 
+# webs_bycounty <- webs_complete %>%
+#   filter(BiomeCode != "NA")%>%
+#   distinct(ISO3, .keep_all = TRUE) 
+# 
+# biome.net.m2 <- glm(Total_webs_by_country ~ log(AREA_biome_total) * Hemisphere,
+#                     data = webs_bycounty,
+#                     family = "poisson")
+# summary(biome.net.m2)
+# 
+# performance::check_model(biome.net.m2)
