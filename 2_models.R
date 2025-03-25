@@ -32,37 +32,50 @@ webs_country$Continent <- factor(webs_country$Continent,
                                               "Asia"))
 
 #negative binomial
-country.mod.two <- glm.nb(Total_webs_by_country ~ Continent +
+country.mod.large <- glm.nb(Total_webs_by_country ~ Continent +
                                   scale(log(AREA)) +
                                   scale(log(PropGDP_median)) +
                                   scale(log(CL_Species)),
                                 data = webs_country)
-performance::check_model(country.mod.two)
-#https://cran.r-project.org/web/packages/DHARMa/vignettes/DHARMa.html
-sim_res <- simulateResiduals(country.mod.two)
-plot(sim_res)  
 
-summary(country.mod.two)
 
-# # Fit zero-inflated negative binomial model
-# country.mod.zi <- glmmTMB(
-#   Total_webs_by_country ~ Continent +
-#     scale(log(AREA)) +
-#     scale(log(PropGDP_median)) +
-#     scale(log(CL_Species)),      
-#   ziformula = ~ 1,          
-#   family = nbinom2,                 
-#   data = webs_country
-# )
+country.mod.small <- glm.nb(Total_webs_by_country ~ Continent +
+                              scale(log(AREA)) +
+                              scale(log(PropGDP_median)) +
+                              scale(log(CL_Species)),
+                            data = webs_country)
+#sequential test, may inflate the significance of varibales added "early"
+anova(country.mod.large)
+# Compare the models using a likelihood ratio test
+anova(country.mod.large, country.mod.small, test = "Chisq")
+
+summary(country.mod.large)
+
+#this doesn't work because negative binomial 
+#library(pbkrtest)
+#pb <- PBmodcomp(country.mod.large, country.mod.small)
+#pb
+
 # 
-# # Check model diagnostics
-# performance::check_model(country.mod.zi)
-# # Simulate residuals and plot diagnostics
-# sim_res_zi <- simulateResiduals(country.mod.zi)
-# plot(sim_res_zi)
-# 
-# # Summarize the model
-# summary(country.mod.zi)
+# # # Fit zero-inflated negative binomial model
+#  country.mod.zi <- glmmTMB(
+#    Total_webs_by_country ~ Continent +
+#      scale(log(AREA)) +
+#      scale(log(PropGDP_median)) +
+#      scale(log(CL_Species)),      
+#     ziformula = ~ 1,          
+#    family = nbinom2,                 
+#    data = webs_country
+#  )
+# # 
+# # # Check model diagnostics
+#   performance::check_model(country.mod.zi)
+# # # Simulate residuals and plot diagnostics
+# # sim_res_zi <- simulateResiduals(country.mod.zi)
+# # plot(sim_res_zi)
+# # 
+# # # Summarize the model
+#  summary(country.mod.zi)
 
 ## ***********************************************
 ## network re-use
