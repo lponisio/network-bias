@@ -15,7 +15,7 @@ library(ggplot2)
 ## library(ggeffects)
 library(viridis)
 #data
-webs_complete <- read.csv("network-bias-saved/raw/saved/webs_complete.csv")
+webs_complete <- read.csv("network-bias-saved/saved/webs_complete.csv")
 
 savefilepath <- c("network-bias-saved/manuscript/figures")
 
@@ -35,8 +35,8 @@ webs_bycounty <- webs_complete %>%
   filter(BiomeCode != "NA")%>%
   distinct(ISO3, .keep_all = TRUE) 
 
-webs_bycounty$logArea <- log(webs_bycounty$AREA_biome_total)
-webs_bycounty$logNetworksCountry <- log(webs_bycounty$Total_webs_by_country)
+webs_bycounty$logArea <- log(webs_bycounty$AREA_biome_total+ 1)
+webs_bycounty$logNetworksCountry <- log(webs_bycounty$Total_webs_by_country+ 1)
 
 ## ***********************************************
 
@@ -88,16 +88,19 @@ webs_country$Continent <- factor(webs_country$Continent,
 webs_country$log_CL_Species <- log(webs_country$CL_Species + 1)
 
 ## ***********************************************
-webs_country$logNetworksCountry <- log(webs_country$Total_webs_by_country)
+webs_country$logNetworksCountry <- log(webs_country$Total_webs_by_country+ 1)
 
-#area of country by networks
 area <- ggplot(webs_country,
                aes(x = log(AREA), y = logNetworksCountry, color = Continent)) +
-  geom_point() +
-  scale_color_viridis(discrete = T) +
-  geom_smooth(method = "glm", se = T,
-              method.args = list(family = "poisson")) +
-  labs(x="Country Area (log)", y="Networks (log)") +
+  geom_point(show.legend = FALSE) +  # Remove legend from points
+  scale_color_viridis(discrete = TRUE) +
+  geom_smooth(method = "glm",
+              method.args = list(family = "quasipoisson"), # Closest match to neg. binomial in ggplot
+              formula = y ~ scale(x),
+              se = TRUE, show.legend = FALSE) +
+  scale_x_continuous(labels = function(x) round(exp(x), -2)) + # Convert log-scale to original
+  scale_y_continuous(labels = function(x) round(exp(x))) + # Convert log-scale to original
+  labs(x = "Area", y = "Networks") +
   theme_classic()
 
 #research invs by networks
@@ -105,25 +108,37 @@ res_inv <- ggplot(webs_country,
                   aes(x = PropGDP_median, y = logNetworksCountry, color = Continent)) +
   geom_point() +
   scale_color_viridis(discrete = T) +
-  geom_smooth(method = "glm", se = T,
-              method.args = list(family = "poisson")) +
-  labs(x="Research Investment (PropGDP_median)", y="Networks (log)") +
+  geom_smooth(method = "glm",
+              method.args = list(family = "quasipoisson"), # Closest match to neg. binomial in ggplot
+              formula = y ~ scale(x),
+              se = TRUE) +
+  scale_y_continuous(labels = function(x) round(exp(x), -1)) + # Convert log-scale to original
+  labs(x="Research Investment (PropGDP_median)", y="") +
   theme_classic()
 
 #Bee species
 bees <- ggplot(webs_country,
                aes(x = log_CL_Species, y = logNetworksCountry, color = Continent)) +
-  geom_point() +
+  geom_point(show.legend = FALSE) +
   scale_color_viridis(discrete = T) +
-  geom_smooth(method = "glm", se = T,
-              method.args = list(family = "poisson")) +
-  labs(x="Bee Species (log)", y="Networks (log)") +
-  theme_classic()
+  geom_smooth(method = "glm",
+              method.args = list(family = "quasipoisson"), # Closest match to neg. binomial in ggplot
+              formula = y ~ scale(x),
+              se = TRUE, show.legend = FALSE) +
+  scale_x_continuous(labels = function(x) round(exp(x), -1)) + # Convert log-scale to original
+  scale_y_continuous(labels = function(x) round(exp(x), -1)) + 
+  labs(x="Bee Species", y="") +
+  theme_classic()   # Move legend to bottom
 
-# Arrange plots
-combined_plot <- plot_grid(area, res_inv, bees, ncol = 1,labels="AUTO")
+library(patchwork)
+# Combine the three plots with a centered legend
+combined_plot <- (area + res_inv + bees) +
+  plot_layout(guides = 'collect') +
+  plot_annotation(tag_levels = 'A') &
+  theme(legend.position = "bottom", 
+        legend.justification = "center")
 
-ggsave(combined_plot, file = paste0(savefilepath, "/combined_plot.jpg"), height = 10, width = 10)
+ggsave(combined_plot, file = paste0(savefilepath, "/combined_plot.jpg"), height = 5, width = 12)
 
 ## ***********************************************
 ## network re-use
@@ -137,15 +152,124 @@ ggsave(combined_plot, file = paste0(savefilepath, "/combined_plot.jpg"), height 
 # we included continent as a random effect. 
 ## ***********************************************
 webs_reuse <- webs_complete %>%
-  distinct(Web_Code, .keep_all = TRUE) %>%
-  mutate(years_since_pub = as.numeric(format(Sys.Date(), "%Y")) - Publi_Year)
+  filter(!is.na(Use_Frequency))%>%
+  mutate(network_type = ifelse(Use_Frequency == 1, "Original", "Reused"))
 
+# Summarize the count of original and reused networks by year
+yearly_trend <- webs_reuse %>%
+  group_by(Publi_Year, network_type) %>%
+  summarise(paper_count = n(), .groups = "drop")
+
+#line
+ggplot(yearly_trend[(yearly_trend$Publi_Year > 2000),]) +
+  geom_point(aes(x = Publi_Year, y = paper_count, color = network_type))+
+  geom_line(aes(x = Publi_Year, y = paper_count, color = network_type))+
+  theme_minimal() +
+  labs(x = "Publication Year", y = "Total Publications") 
+## ***********************************************
+
+large <-ggplot(webs_reuse, 
+       aes(x = years_since_pub, 
+           y = Use_Frequency, 
+           color = ISO3)) +
+  geom_text(aes(label = ISO3), 
+            position = position_jitter(width = 1.5, height = 1.5), 
+            check_overlap = FALSE,
+            show.legend = FALSE) +
+  labs(
+    x = "",         
+    y = "Use Frequncy"                  
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title = element_text(size = 18),  
+    axis.text = element_text(size = 18) 
+  )
+  
+webs_medium <-webs_reuse[(webs_reuse$years_since_pub <25),]
+
+medium <- ggplot(webs_medium,
+       aes(x = years_since_pub, 
+           y = Use_Frequency, 
+           color = ISO3)) +
+  geom_text(aes(label = ISO3), 
+            size = 4,
+            position = position_jitter(width = 1.5, height = 1.5), 
+            check_overlap = FALSE,
+            show.legend = FALSE) +
+  labs(
+    x = "",         
+    y = ""                  
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title = element_text(size = 18),  
+    axis.text = element_text(size = 18) 
+  )
+
+webs_small <-webs_reuse[(webs_reuse$years_since_pub <20),]
+
+webs_small<-webs_small[(webs_small$Use_Frequency <10),]
+
+small <-ggplot(webs_small,
+       aes(x = years_since_pub, 
+           y = Use_Frequency, 
+           color = ISO3)) +
+  geom_text(aes(label = ISO3), 
+            size = 4,
+            position = position_jitter(width = 1.5, height = 1.5), 
+            check_overlap = FALSE,
+            show.legend = FALSE) +
+  labs(
+    x = "Years Since Publication",         
+    y = "Use Frequency"                  
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title = element_text(size = 18),  
+    axis.text = element_text(size = 18) 
+  )
+
+webs_smallest <-webs_reuse[(webs_reuse$years_since_pub <10),]
+
+webs_smallest <-webs_smallest[(webs_smallest$Use_Frequency <2.5),]
+
+extra_small <- ggplot(webs_smallest,
+       aes(x = years_since_pub, 
+           y = Use_Frequency, 
+           color = ISO3)) +
+  geom_text(aes(label = ISO3), 
+            size = 4,
+            position = position_jitter(width = 1.5, height = 1.5), 
+            check_overlap = FALSE,
+            show.legend = FALSE) +
+  labs(
+    x = "Years Since Publication",         
+    y = ""                  
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title = element_text(size = 18),  
+    axis.text = element_text(size = 18) 
+  )
+
+
+library(patchwork)
+# Combine the three plots with a centered legend
+combined_plot_reuse <- (large + medium + small +extra_small) +
+  plot_layout(guides = 'collect') +
+  plot_annotation(tag_levels = 'A') 
+
+ggsave(combined_plot_reuse, file = paste0(savefilepath, "/combined_plot_reuse.jpg"), height = 20, width = 20)
+
+
+## ***********************************************
 
 #boxplot
-ggplot(webs_reuse, aes(x = reorder(ISO3, Use_Frequency, median), y = Use_Frequency)) +
+ggplot(webs_reuse, aes(x = factor(years_since_pub), y = Use_Frequency)) +
   geom_boxplot() +
   theme_minimal() +
-  labs(x = "Country", y = "Data Reuse Count") +
+  labs(x = "years_since_pub", y = "Data Reuse Count") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 #heat map

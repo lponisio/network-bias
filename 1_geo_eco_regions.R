@@ -354,6 +354,17 @@ final <- final %>%
 
 
 ## ***********************************************
+## Correcting Continent
+## ***********************************************
+
+final <- final %>%
+  mutate(Continent = ifelse(Continent == "Americas" & Hemisphere == "Northern", 
+                            "Northern America", 
+                            ifelse(Continent == "Americas" & Hemisphere == "Southern", 
+                                   "Southern America", 
+                                   Continent)))
+
+## ***********************************************
 write.csv(final, file = "saved/webs_complete.csv")
 
 

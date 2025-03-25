@@ -8,6 +8,10 @@ library(cowplot)
 library(ggplot2)
 ## library(ggeffects)
 library(viridis)
+library(glmmTMB)
+library(car)
+library(DHARMa)
+
 #data
 webs_complete <- read.csv("network-bias-saved/saved/webs_complete.csv")
 
