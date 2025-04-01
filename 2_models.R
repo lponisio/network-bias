@@ -20,7 +20,10 @@ source("network-bias/src/initalize_models.R")
 ## ***********************************************
 webs_country <- webs_complete %>%
   distinct(ISO3, .keep_all = TRUE) %>%
-  filter(!is.na(CL_Species))
+  filter(!is.na(Continent) & 
+           !is.na(AREA) & 
+           !is.na(PropGDP_median) & 
+           !is.na(CL_Species))
 
 webs_country <- webs_country[webs_country$Continent != "Oceania",]
 
@@ -31,59 +34,64 @@ webs_country$Continent <- factor(webs_country$Continent,
                                               "Europe",
                                               "Asia"))
 
-
-# Identify missing values
-colSums(is.na(webs_country))
-
-# Check for problematic log-transformed values
-summary(log(webs_country$AREA))
-summary(log(webs_country$PropGDP_median))
-summary(log(webs_country$CL_Species))
+# Ensure the dataset contains the required transformed variables
+webs_country$log_AREA <- scale(log(webs_country$AREA))
+webs_country$log_PropGDP_median <- scale(log(webs_country$PropGDP_median))
+webs_country$log_CL_Species <- scale(log(webs_country$CL_Species))
 
 
-# Drop rows with NAs in model-relevant columns
-webs_country_clean <- webs_country %>%
-  dplyr::filter(!is.na(Continent) & !is.na(AREA) & !is.na(PropGDP_median) & !is.na(CL_Species))
+M1 <- MASS::glm.nb(Total_webs_by_country ~ Continent +
+                log_AREA +
+                log_PropGDP_median +
+                log_CL_Species,
+              #family = nbinom2,
+             data = webs_country)
 
-# Check again for missing values
-colSums(is.na(webs_country_clean))
+summary(M1)
+check_model(M1)
 
 
-#negative binomial
-M1 <- glm.nb(Total_webs_by_country ~ Continent +
-                                  scale(log(AREA)) +
-                                  scale(log(PropGDP_median)) +
-                                  scale(log(CL_Species)),
-                                  data = webs_country)
-nboot <- 1000
-bres <- matrix(NA,nrow=nboot,
-               ncol=length(coef(M1)),
-               dimnames=list(rep=seq(nboot),
-                             coef=names(coef(M1))))
 
-set.seed(101)
-bootsize <- 200
-for (i in seq(nboot)) {
-  bdat <- webs_country[sample(nrow(webs_country),size=bootsize,replace=TRUE),]
-  bfit <- update(M1, data=bdat)  ## refit with new data
-  bres[i,] <- coef(bfit)
+boot_fun <- function(model, data) {
+  # Extract fitted values (mu) and dispersion parameter (theta)
+  mu <- fitted(model)  # Mean of the negative binomial distribution
+  theta <- model$theta  # Dispersion parameter
+  
+  # Simulate new response values using the negative binomial distribution
+  sim_response <- rnbinom(n = length(mu), size = theta, mu = mu)
+  
+  # Replace the response column with the simulated data
+  data$Total_webs_by_country <- sim_response
+  
+  # Fit the model to the simulated data
+  sim_model <- update(model, data = data)
+  
+  # Return the coefficients from the simulated model
+  return(coef(sim_model))
 }
 
-data.frame(mean_est=colMeans(bres),
-           t(apply(bres,2,quantile,c(0.025,0.975))))
 
-country.mod.small <- glm.nb(Total_webs_by_country ~ Continent +
-                              scale(log(AREA)) +
-                              scale(log(PropGDP_median)) +
-                              scale(log(CL_Species)),
-                            data = webs_country)
+n_iter <- 1000  # Number of bootstrap iterations
+boot_results <- replicate(n_iter, boot_fun(M1, webs_country))
 
-#sequential test, may inflate the significance of varibales added "early"
-anova(country.mod.large)
-# Compare the models using a likelihood ratio test
-anova(country.mod.large, country.mod.small, test = "Chisq")
 
-summary(country.mod.large)
+
+boot_results_df <- as.data.frame(t(boot_results))
+colnames(boot_results_df) <- names(coef(M1))  # Assign coefficient names
+boot_ci <- apply(boot_results_df, 2, function(x) quantile(x, probs = c(0.025, 0.975)))  # 95% CI
+boot_ci
+
+
+
+
+
+
+#######
+
+
+
+
+
 
 #this doesn't work because negative binomial 
 #library(pbkrtest)
@@ -124,32 +132,35 @@ summary(country.mod.large)
 ## ***********************************************
 webs_reuse <- webs_complete %>%
   distinct(Web_Code, .keep_all = TRUE) %>%
-  mutate(years_since_pub = as.numeric(format(Sys.Date(), "%Y")) - Publi_Year)
+  filter(!is.na(years_since_pub),
+         years_since_pub<90)
 
-#ARG is the intercept :)
-webs_reuse_mod <- glm(Use_Frequency ~ ISO3 +years_since_pub,
-                             data=webs_reuse,
-                             ## ziformula = ~1,
-                             family = "poisson")
+
+library(glmmTMB)
+# Model with variable dispersion
+webs_reuse_mod <- glmmTMB(Use_Frequency ~ ISO3 + years_since_pub,
+                          data = webs_reuse, ziformula = ~ 1, 
+                          family = nbinom2
+                         )
 
 summary(webs_reuse_mod)
 
 performance::check_model(webs_reuse_mod)
 
-
+years_since_pub
 
 ## ***********************************************
 #gonna put this in a function/source file later but I am trying to tidy up my 
 #latex table code to automatically populate results
 
 
-table_biome <- format_glm_table(
-  biome.net.m2,
-  caption = "biome.net.m2"
-)
+#table_biome <- format_glm_table(
+#  biome.net.m2,
+#  caption = "biome.net.m2"
+#)
 
 table_country <- format_glm_table(
-  country.mod_continent,
+  M1,
   caption = "country.mod_continent"
 )
 
@@ -158,7 +169,22 @@ table_reuse <- format_glm_table(
   caption = "webs_reuse_mod"
 )
 
+# Extract ISO3 codes (matching 'ISO3XXX' pattern)
+iso3_codes <- unique(regmatches(table_reuse, gregexpr("ISO3[A-Z]{3}", table_reuse))[[1]])
 
+# Remove 'ISO3' prefix to get the actual ISO3 codes
+iso3_clean <- gsub("ISO3", "", iso3_codes)
+
+# Convert to country names
+country_names <- countrycode(iso3_clean, origin = "iso3c", destination = "country.name")
+
+# Create a mapping of ISO3 to country names
+iso3_to_country <- setNames(country_names, iso3_codes)
+
+# Replace each ISO3 code with its corresponding country name
+for (iso3 in names(iso3_to_country)) {
+  table_reuse <- gsub(iso3, iso3_to_country[[iso3]], table_reuse)
+}
 
 
 ## ***********************************************

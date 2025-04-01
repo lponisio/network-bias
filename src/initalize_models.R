@@ -57,3 +57,152 @@ format_glm_table <- function(model, caption = "Regression Results", savefilepath
   
   return(latex_table)
 }
+
+
+
+## Runs models based on a formula, family, response variable, and data
+mod <- function(forms,
+                fam,
+                ys,
+                dats,
+                return.sum = FALSE) {
+  
+  if (fam == "poisson") {
+    out.mod <- glmer(forms,
+                     family = fam,
+                     data = dats,
+                     nAGQ = 10L,
+                     control = glmerControl(optimizer = "bobyqa",
+                                            optCtrl = list(maxfun = 1e9)))
+    
+  } else if (fam == "nbinomRandom") {
+    out.mod <- glmer.nb(forms,
+                        data = dats,
+                        control = glmerControl(optimizer = "bobyqa",
+                                               optCtrl = list(maxfun = 1e9),
+                                               tolPwrss = 1e-3))
+    
+  } else if (fam == "gaussian") {
+    out.mod <- lmer(forms, data = dats)
+    
+  } else if (fam == "nbinom") {
+    out.mod <- glm.nb(forms, data = dats)
+    
+  } else {
+    stop("Unsupported family. Use 'poisson', 'nbinomRandom', 'gaussian', or 'nbinom'.")
+  }
+  
+  # Return summary or model object
+  if (return.sum) {
+    return(summary(out.mod))
+  } else {
+    return(out.mod)
+  }
+}
+
+
+
+# 
+# 
+ #para.boot <- function(largeModel, smallModel, nsim){
+#   pboot <- function(m1, m0) {
+#   sims <- simulateFun(m0)
+#  L0 <- logLik(refit(m0, sims))
+#     L1 <- logLik(refit(m1, sims))
+#     return(2*(L1 - L0))
+#   }
+#   obsval <- c(2*(logLik(largeModel) - logLik(smallModel)))
+#   pbdist <- replicate(nsim, pboot(m1=largeModel, m0=smallModel))
+#   pval <- mean(c(obsval, pbdist) >= obsval)
+#   return(c(stat=round(obsval, 3),
+#            p.value=round(pval, 5)))
+# }
+# 
+# boot.all <- function(dat.mods, ## data
+#                      formulas, ## full model formula
+#                      formulas.nest, ## model formula without xvar of interest
+#                      fams, ## family
+#                      ys, ## response variable
+#                      nsim){
+#   
+#   ## run nested model
+#   nest.mods <-  mod(forms= formulas.nest,
+#                     fam= fams,
+#                     ys= ys,
+#                     dats=dat.mods)
+#   ## run full model
+#   all.mods <-  mod(forms= formulas,
+#                    fam= fams,
+#                    ys= ys,
+#                    dats=dat.mods)
+#   ## run bootrap
+#   out.vals <- para.boot(largeModel=all.mods,
+#                         smallModel=nest.mods,
+#                         nsim = nsim)
+#   return(out.vals)
+# }
+para.boot <- function(largeModel, smallModel, nsim) {
+  # Helper function to perform the bootstrap
+  pboot <- function(m1, m0) {
+    # Simulate new response values based on small model (m0)
+    sims <- simulate(m0, nsim = 1)[[1]]  # Simulate response values
+    
+    # Update the data with the simulated response
+    m0_data <- m0$model
+    m0_data[[as.character(formula(m0))[2]]] <- sims  # Update response variable
+    
+    # Refit the models with the simulated data
+    refitted_m0 <- update(m0, data = m0_data)
+    refitted_m1 <- update(m1, data = m0_data)
+    
+    # Calculate log-likelihoods for the refitted models
+    L0 <- logLik(refitted_m0)
+    L1 <- logLik(refitted_m1)
+    
+    # Return the likelihood ratio statistic
+    return(2 * (L1 - L0))
+  }
+  
+  # Calculate the observed likelihood ratio statistic
+  obsval <- 2 * (logLik(largeModel) - logLik(smallModel))
+  
+  # Perform the bootstrap by replicating the procedure
+  pbdist <- replicate(nsim, pboot(m1 = largeModel, m0 = smallModel))
+  
+  # Calculate p-value by comparing observed vs bootstrap statistics
+  pval <- mean(c(obsval, pbdist) >= obsval)
+  
+  # Return the observed statistic and p-value
+  return(c(stat = round(obsval, 3), p.value = round(pval, 5)))
+}
+
+
+se.boot <- function(largeModel,
+                    smallModel,
+                    param = "s.simpson.div", ## xvar of interest
+                    nsim){
+  p.sim <- function(m1, m0, param){
+    sims <- simulateFun(m0)
+    new.model <- refit(m1, sims)
+    out.param <- coef(summary(new.model))[param,
+                                          'Estimate']
+    return(out.param)
+  }
+  pb <-  replicate(nsim, p.sim(m1=largeModel,
+                               m0=smallModel,
+                               param=param))
+  
+  if(!is.null(dim(pb))){
+    se.param <- apply(pb, 1, sd)
+    names(se.param) <- rownames(pb)
+  } else {
+    se.param <- sd(pb)
+  }
+  return(se.param)
+}
+
+
+
+
+
+
