@@ -11,6 +11,8 @@ setwd(local.path)
 #get data
 setwd("network-bias-saved/")
 webs <- read.csv("raw/webs.csv", sep = ";")
+webs_reuse <- read.csv("raw/network_reuse.csv", sep = ";")
+
 res.inv <- read.csv("raw/research_expenditure.csv")
 gdp <- read.csv("raw/gdp.csv")
 biome.code <- read.csv("raw/biome_codes.csv")

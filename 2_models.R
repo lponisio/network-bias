@@ -48,6 +48,9 @@ M1 <- glm.nb(Total_webs_by_country ~ Continent +
                    #family = nbinom2,
                    data = webs_country)
 
+summary(M1)
+check_model(M1)
+
 
 boot_fun <- function(model, data) {
   # Extract fitted values (mu) and dispersion parameter (theta)
@@ -83,38 +86,6 @@ boot_ci
 
 
 
-#######
-
-
-
-
-
-
-#this doesn't work because negative binomial 
-#library(pbkrtest)
-#pb <- PBmodcomp(country.mod.large, country.mod.small)
-#pb
-
-# 
-# # # Fit zero-inflated negative binomial model
-#  country.mod.zi <- glmmTMB(
-#    Total_webs_by_country ~ Continent +
-#      scale(log(AREA)) +
-#      scale(log(PropGDP_median)) +
-#      scale(log(CL_Species)),      
-#     ziformula = ~ 1,          
-#    family = nbinom2,                 
-#    data = webs_country
-#  )
-# # 
-# # # Check model diagnostics
-#   performance::check_model(country.mod.zi)
-# # # Simulate residuals and plot diagnostics
-# # sim_res_zi <- simulateResiduals(country.mod.zi)
-# # plot(sim_res_zi)
-# # 
-# # # Summarize the model
-#  summary(country.mod.zi)
 
 ## ***********************************************
 ## network re-use
@@ -128,27 +99,13 @@ boot_ci
 # we included continent as a random effect. 
 ## ***********************************************
 webs_reuse <- webs_complete %>%
-  distinct(Web_Code, .keep_all = TRUE) %>%
   filter(!is.na(years_since_pub),
          years_since_pub<90)
-
-webs_reuse$years_since_pub
-
-library(glmmTMB)
-# Model with variable dispersion
-webs_reuse_mod <- glmmTMB(Use_Frequency-1 ~ Continent * years_since_pub,
-                          data = webs_reuse, 
-                          family = nbinom2
-                         )
-summary(webs_reuse_mod)
-performance::check_model(webs_reuse_mod)
-
-
-#webs_reuse$Use_Frequency <-(webs_reuse$Use_Frequency-1)
+webs_reuse$webs_reuse_count
 
 
 library(MASS)
-M1_nb <- glm.nb(Use_Frequency ~ Continent *years_since_pub, data = webs_reuse)
+M1_nb <- glm.nb(webs_reuse_count ~ Continent *years_since_pub, data = webs_reuse)
 summary(M1_nb)
 performance::check_model(M1_nb)
 
@@ -183,21 +140,7 @@ colnames(boot_results_df) <- names(coef(M1_nb))  # Assign coefficient names
 boot_ci <- apply(boot_results_df, 2, function(x) quantile(x, probs = c(0.025, 0.975)))  # 95% CI
 boot_ci
 
-
-
-#check hurdle and boot strap them both
-#double check if the re-use is updated 
-#its ok to exclude, and why we exxluded 
-
 ## ***********************************************
-#gonna put this in a function/source file later but I am trying to tidy up my 
-#latex table code to automatically populate results
-
-
-#table_biome <- format_glm_table(
-#  biome.net.m2,
-#  caption = "biome.net.m2"
-#)
 
 table_country <- format_glm_table(
   M1,
@@ -209,49 +152,4 @@ table_reuse <- format_glm_table(
   caption = "webs_reuse_mod"
 )
 
-# Extract ISO3 codes (matching 'ISO3XXX' pattern)
-iso3_codes <- unique(regmatches(table_reuse, gregexpr("ISO3[A-Z]{3}", table_reuse))[[1]])
-
-# Remove 'ISO3' prefix to get the actual ISO3 codes
-iso3_clean <- gsub("ISO3", "", iso3_codes)
-
-# Convert to country names
-country_names <- countrycode(iso3_clean, origin = "iso3c", destination = "country.name")
-
-# Create a mapping of ISO3 to country names
-iso3_to_country <- setNames(country_names, iso3_codes)
-
-# Replace each ISO3 code with its corresponding country name
-for (iso3 in names(iso3_to_country)) {
-  table_reuse <- gsub(iso3, iso3_to_country[[iso3]], table_reuse)
-}
-
-
 ## ***********************************************
-#We are no longer analyzing biome because all the other metrics are at the country
-#level
-## ***********************************************
-
-
-## ***********************************************
-## Biome models
-## ***********************************************
-## from manuscript currently
-# To test whether network collection is related to the biome area in the Northern 
-# and Southern hemispheres, we included the number of networks by country as a 
-# response variable and the biome area as an explanatory variable in a generalized 
-# linear model (GLM).  We included an interaction between biome area and Northern 
-# vs. Southern hemispehere to allow the accumulation of network with are to vary 
-# by hemisphere. 
-## ***********************************************
-#we now have 
-# webs_bycounty <- webs_complete %>%
-#   filter(BiomeCode != "NA")%>%
-#   distinct(ISO3, .keep_all = TRUE) 
-# 
-# biome.net.m2 <- glm(Total_webs_by_country ~ log(AREA_biome_total) * Hemisphere,
-#                     data = webs_bycounty,
-#                     family = "poisson")
-# summary(biome.net.m2)
-# 
-# performance::check_model(biome.net.m2)

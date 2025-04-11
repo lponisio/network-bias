@@ -9,9 +9,20 @@ source("network-bias/src/initailize.R")
 ## General cleaning of web data
 ## ***********************************************
 
+webs_reuse_count <- webs_reuse%>%
+  group_by(Web_Code)%>%
+  summarise(webs_reuse_count = n()-1)
+
+webs_reuse_count
+
+webs <- merge(webs_reuse_count, webs)
+
+
+## ***********************************************
+
 #columns to keep 
 col_keep <- c("Web_Code", "Use_Frequency", "Publi_Year","LAT", "LONG", "Region",
-              "Country", "ISO3", "Continent", "Hemisphere","Biome_WWF")
+              "Country", "ISO3", "Continent", "Hemisphere","Biome_WWF", "webs_reuse_count")
 
 # Keep only the specified columns
 webs <- webs[, col_keep, drop = FALSE]
