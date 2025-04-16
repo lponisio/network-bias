@@ -14,6 +14,19 @@ library(cowplot)
 library(ggplot2)
 ## library(ggeffects)
 library(viridis)
+library(ggplot2)
+library(tidyverse)
+library(maps)
+library(grid) # For unit()
+
+# Load required libraries
+library(rnaturalearth)  # for world map data
+library(sf)             # for spatial data manipulation
+library(cartogram)      # for generating cartograms
+library(dplyr)
+library(ggplot2)
+library(scales)
+
 #data
 webs_complete <- read.csv("network-bias-saved/saved/webs_complete.csv")
 
@@ -179,3 +192,193 @@ ggplot(yearly_counts, aes(x = Publi_Year, y = count, color = Status)) +
   )
 
 ## ***********************************************
+
+
+# Load the dataset
+webs <- read.csv("network-bias-saved/raw/webs.csv", sep = ";")
+
+# Summarize number of networks per country
+country_summary <- webs %>%
+  group_by(Country) %>%
+  summarise(value = n())
+
+# Prepare point data with coordinates
+coor <- webs %>%
+  filter(!is.na(LAT) & !is.na(LONG)) %>%
+  rename(lat = LAT, lon = LONG)
+
+# Load world map
+world <- map_data("world")
+
+#Plot map
+map_net <- ggplot() +
+  # Base map
+  geom_map(
+    data = world, map = world,
+    aes(map_id = region),
+    color = "black", fill = "#DDDDDD", size = 0.1
+  ) +
+  # Country fill (green)
+  geom_map(
+    data = country_summary, map = world,
+    aes(map_id = Country, fill = value),
+    color = "white", size = 0.25
+  ) +
+  # Network points (orange)
+  geom_point(
+    data = coor,
+    aes(x = lon, y = lat, color = Use_Frequency),
+    alpha = 0.9, size = 3
+  ) +
+  # Fill scale (green)
+  scale_fill_gradientn(
+    colours = c("#D9F0D3", "#A6DBA0", "#5AAE61", "#1B7837"),
+    name = "Number of networks",
+    guide = guide_colourbar(
+      direction = "horizontal",
+      barheight = unit(2, units = "mm"),  # smaller legend height
+      barwidth = unit(50, units = "mm"),  # smaller legend width
+      draw.ulim = FALSE,
+      title.hjust = 0.5,
+      label.hjust = 0.5,
+      title.position = "top"
+    )
+  ) +
+  # Point color scale (orange)
+  scale_color_gradientn(
+    colours = c("#FFE5B4", "#FDB863", "#E08214", "#B35806"),
+    name = "Network use frequency",
+    guide = guide_colourbar(
+      direction = "horizontal",
+      barheight = unit(2, units = "mm"),
+      barwidth = unit(50, units = "mm"),
+      draw.ulim = FALSE,
+      title.hjust = 0.5,
+      label.hjust = 0.5,
+      title.position = "top"
+    )
+  ) +
+  # Fix the map area to fully include South America (Argentina)
+  coord_fixed(xlim = c(-180, 180), ylim = c(-60, 90), expand = FALSE) +
+  
+  # Axis labels
+  labs(x = "Longitude", y = "Latitude") +
+  
+  # Theme settings
+  theme_classic() +
+  theme(
+    legend.position = "bottom",
+    axis.text = element_text(size = 10),
+    axis.title = element_text(size = 16, face = "bold"),
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12, face = "bold"),
+    plot.margin = margin(5, 5, 5, 5)  # reduce white space around the plot
+  )
+
+#Saving
+tiff('nets_map.tif', w=6000, h=3400, units="px", res=600, compression = "lzw")
+map_net
+dev.off()
+## ***********************************************
+
+
+#-----------------------------------------------
+# Load datasets
+#-----------------------------------------------
+webs <- read.csv("network-bias-saved/raw/webs.csv", sep = ";")
+bees <- read.csv("network-bias-saved/raw/bees_by_country.csv", sep = ",")
+gdp  <- read.csv("network-bias-saved/raw/gdp.csv", sep = ",")
+
+#-----------------------------------------------
+# Prepare base world map (excluding Antarctica)
+#-----------------------------------------------
+world_map <- ne_countries(returnclass = "sf") %>%
+  select(gu_a3) %>%
+  filter(gu_a3 != "ATA") %>%
+  st_transform(crs = "+proj=robin")  # Robinson projection
+
+#-----------------------------------------------
+# 1. Cartogram based on number of networks per country
+#-----------------------------------------------
+net.country <- webs %>%
+  count(ISO3)
+
+world_data1 <- left_join(world_map, net.country, by = c("gu_a3" = "ISO3"))
+world_data1[is.na(world_data1$n), "n"] <- 1  # Fill NAs with 1 to avoid zero-size countries
+
+world_carto1 <- cartogram_cont(world_data1, "n", maxSizeError = 1.5)
+plot(world_carto1["n"])  # Plot cartogram with network count
+
+#-----------------------------------------------
+# 2. Cartogram based on number of bee species per country
+#-----------------------------------------------
+# Rename columns for easier use
+bees2 <- bees %>% select(ISO3, CL_Species)
+
+world_data2 <- left_join(world_map, bees2, by = c("gu_a3" = "ISO3")) %>%
+  na.omit()
+
+world_carto2 <- cartogram_cont(world_data2, "CL_Species", maxSizeError = 1.5)
+plot(world_carto2["CL_Species"])
+
+#-----------------------------------------------
+# 3. Cartogram based on GDP in 2020
+#-----------------------------------------------
+real.gdp <- gdp %>%
+  select(Country.Code, X2020)
+
+world_data3 <- left_join(world_map, real.gdp, by = c("gu_a3" = "Country.Code")) %>%
+  na.omit()
+
+world_carto3 <- cartogram_cont(world_data3, "X2020", maxSizeError = 1.5)
+plot(world_carto3["X2020"])
+
+#-----------------------------------------------
+# 4. Plot cartogram with ggplot2
+#-----------------------------------------------
+
+# Custom color palette (orange to green)
+custom_palette <- c("#FFE5B4", "#FDB863", "#E08214", "#5AAE61", "#1B7837")
+
+# 1. Number of networks
+p1 <- ggplot(world_carto1) +
+  geom_sf(aes(fill = n), color = "gray20", linewidth = 0.2) +
+  scale_fill_gradientn(colors = custom_palette, name = "Number of networks") +
+  labs(x = "Longitude", y = NULL) +
+  theme_classic(base_size = 13) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10)
+  )
+
+# 2. Research investment
+p2 <- ggplot(world_carto3) +
+  geom_sf(aes(fill = X2020), color = "gray20", linewidth = 0.2) +
+  scale_fill_gradientn(colors = custom_palette, name = "Research investment\n($ US Dollar)",
+                       labels = label_number(scale_cut = cut_short_scale())) +
+  labs(x = "Longitude", y = NULL) +
+  theme_classic(base_size = 13) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10)
+  )
+
+# 3. Number of bee species
+p3 <- ggplot(world_carto2) +
+  geom_sf(aes(fill = CL_Species), color = "gray20", linewidth = 0.2) +
+  scale_fill_gradientn(colors = custom_palette, name = "Number of bee species") +
+  labs(x = "Longitude", y = NULL) +
+  theme_classic(base_size = 13) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10)
+  )
+
+
+
+
+
+
