@@ -21,8 +21,8 @@ webs <- merge(webs_reuse_count, webs)
 ## ***********************************************
 
 #columns to keep 
-col_keep <- c("Web_Code", "Use_Frequency", "Publi_Year","LAT", "LONG", "Region",
-              "Country", "ISO3", "Continent", "Hemisphere","Biome_WWF", "webs_reuse_count")
+col_keep <- c("Web_Code", "webs_reuse_count", "Publi_Year","LAT", "LONG", "Region",
+              "Country", "ISO3", "Continent", "Hemisphere","Biome_WWF")
 
 # Keep only the specified columns
 webs <- webs[, col_keep, drop = FALSE]
