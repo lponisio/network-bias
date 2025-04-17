@@ -159,23 +159,24 @@ sum(is.na(final$Hemisphere))
 #Assigning north and south america 
 final <- final %>%
   mutate(Continent = ifelse(Continent == "Americas" & Hemisphere == "Northern", 
-                            "Northern America", 
+                            "North America", 
                             ifelse(Continent == "Americas" & Hemisphere == "Southern", 
-                                   "Southern America", 
+                                   "South America", 
                                    Continent)))
 
 ## ***********************************************
-# Find countries in complete$iso3c but not in gdp$Country.Code
-missing_in_gdp <- setdiff(final$ISO3, gdp$Country.Code)
-
-# Print the missing countries
-print("Countries in complete but not in gdp:")
-print(missing_in_gdp)
-
-## we need to drop the webs that don't report GDP
-dim(final)
-final <- final[final$ISO3 != missing_in_gdp,]
-dim(final)
+# I disagree with this, I think we should keep VEN
+# # Find countries in complete$iso3c but not in gdp$Country.Code
+# missing_in_gdp <- setdiff(final$ISO3, gdp$Country.Code)
+# 
+# # Print the missing countries
+# print("Countries in complete but not in gdp:")
+# print(missing_in_gdp)
+# 
+# ## we need to drop the webs that don't report GDP
+# dim(final)
+# final <- final[final$ISO3 != missing_in_gdp,]
+# dim(final)
 
 
 ## need the gdp to convert proportion to $$
@@ -370,9 +371,9 @@ final <- final %>%
 
 final <- final %>%
   mutate(Continent = ifelse(Continent == "Americas" & Hemisphere == "Northern", 
-                            "Northern America", 
+                            "North America", 
                             ifelse(Continent == "Americas" & Hemisphere == "Southern", 
-                                   "Southern America", 
+                                   "South America", 
                                    Continent)))
 
 ## ***********************************************

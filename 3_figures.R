@@ -26,9 +26,9 @@ library(cartogram)      # for generating cartograms
 library(dplyr)
 library(ggplot2)
 library(scales)
-
+library(patchwork)
 #data
-webs_complete <- read.csv("network-bias-saved/saved/webs_complete.csv")
+webs <- read.csv("network-bias-saved/saved/webs_complete.csv")
 
 savefilepath <- c("network-bias-saved/manuscript/figures")
 
@@ -43,7 +43,7 @@ savefilepath <- c("network-bias-saved/manuscript/figures")
 # variables. We included an interaction with each of these variables and continent 
 # to allow their slopes to vary by continent.  
 ## ***********************************************
-webs_complete <- webs_complete[webs_complete$Continent != "Oceania",]
+webs_complete <- webs[webs$Continent != "Oceania",]
 
 webs_complete$Continent <- factor(webs_complete$Continent,
                                   levels=c("Northern America",
@@ -192,59 +192,56 @@ ggplot(yearly_counts, aes(x = Publi_Year, y = count, color = Status)) +
   )
 
 ## ***********************************************
+library(tidyverse)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(sf)
 
+webs[webs$Country == "Greenland",]$ISO3 <- "GRL"
 
-# Load the dataset
-webs <- read.csv("network-bias-saved/raw/webs.csv", sep = ";")
 
 # Summarize number of networks per country
 country_summary <- webs %>%
-  group_by(Country) %>%
-  summarise(value = n())
+  distinct(ISO3, Total_webs_by_country) %>%
+  rename(value=Total_webs_by_country,
+         iso_a3= ISO3)
 
-# Prepare point data with coordinates
+
+# Load world map as an sf object
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+# Merge your ISO3 summary data to the world map
+world_with_data <- world %>%
+  left_join(country_summary, by = "iso_a3")
+
+
 coor <- webs %>%
-  filter(!is.na(LAT) & !is.na(LONG)) %>%
-  rename(lat = LAT, lon = LONG)
+  filter(!is.na(LAT.x) & !is.na(LAT.y)) %>%
+  rename(lat = LAT.x, lon = LONG, Use_Frequency = webs_reuse_count) %>%
+  st_as_sf(coords = c("lon", "lat"), crs = 4326)  # convert to sf points
 
-# Load world map
-world <- map_data("world")
-
-#Plot map
 map_net <- ggplot() +
-  # Base map
-  geom_map(
-    data = world, map = world,
-    aes(map_id = region),
-    color = "black", fill = "#DDDDDD", size = 0.1
-  ) +
-  # Country fill (green)
-  geom_map(
-    data = country_summary, map = world,
-    aes(map_id = Country, fill = value),
-    color = "white", size = 0.25
-  ) +
-  # Network points (orange)
-  geom_point(
-    data = coor,
-    aes(x = lon, y = lat, color = Use_Frequency),
-    alpha = 0.9, size = 3
-  ) +
-  # Fill scale (green)
+  # Base world map with fill by number of networks
+  geom_sf(data = world_with_data, aes(fill = value), color = "white", size = 0.1) +
+  
+  # Add your points on top
+  geom_sf(data = coor, aes(color = Use_Frequency), size = 2, alpha = 0.9) +
+  
+  # Fill scale
   scale_fill_gradientn(
     colours = c("#D9F0D3", "#A6DBA0", "#5AAE61", "#1B7837"),
     name = "Number of networks",
     guide = guide_colourbar(
       direction = "horizontal",
-      barheight = unit(2, units = "mm"),  # smaller legend height
-      barwidth = unit(50, units = "mm"),  # smaller legend width
-      draw.ulim = FALSE,
+      barheight = unit(2, units = "mm"),
+      barwidth = unit(50, units = "mm"),
+      title.position = "top",
       title.hjust = 0.5,
-      label.hjust = 0.5,
-      title.position = "top"
+      label.hjust = 0.5
     )
   ) +
-  # Point color scale (orange)
+  
+  # Point color scale
   scale_color_gradientn(
     colours = c("#FFE5B4", "#FDB863", "#E08214", "#B35806"),
     name = "Network use frequency",
@@ -252,19 +249,17 @@ map_net <- ggplot() +
       direction = "horizontal",
       barheight = unit(2, units = "mm"),
       barwidth = unit(50, units = "mm"),
-      draw.ulim = FALSE,
+      title.position = "top",
       title.hjust = 0.5,
-      label.hjust = 0.5,
-      title.position = "top"
+      label.hjust = 0.5
     )
   ) +
-  # Fix the map area to fully include South America (Argentina)
-  coord_fixed(xlim = c(-180, 180), ylim = c(-60, 90), expand = FALSE) +
   
-  # Axis labels
+  # Coordinate limits
+  coord_sf(xlim = c(-180, 180), ylim = c(-60, 90), expand = FALSE) +
+  
   labs(x = "Longitude", y = "Latitude") +
   
-  # Theme settings
   theme_classic() +
   theme(
     legend.position = "bottom",
@@ -272,66 +267,59 @@ map_net <- ggplot() +
     axis.title = element_text(size = 16, face = "bold"),
     legend.text = element_text(size = 10),
     legend.title = element_text(size = 12, face = "bold"),
-    plot.margin = margin(5, 5, 5, 5)  # reduce white space around the plot
+    plot.margin = margin(5, 5, 5, 5)
   )
-
-#Saving
-tiff('nets_map.tif', w=6000, h=3400, units="px", res=600, compression = "lzw")
-map_net
-dev.off()
-## ***********************************************
 
 
 #-----------------------------------------------
 # Load datasets
 #-----------------------------------------------
-webs <- read.csv("network-bias-saved/raw/webs.csv", sep = ";")
-bees <- read.csv("network-bias-saved/raw/bees_by_country.csv", sep = ",")
-gdp  <- read.csv("network-bias-saved/raw/gdp.csv", sep = ",")
+#webs <- read.csv("network-bias-saved/raw/webs.csv", sep = ";")
+#bees <- read.csv("network-bias-saved/raw/bees_by_country.csv", sep = ",")
+#gdp  <- read.csv("network-bias-saved/raw/gdp.csv", sep = ",")
+
+# Summarize number of networks per country
+country_summary <- webs %>%
+  distinct(ISO3, Total_webs_by_country, CL_Species, PropGDP_median) %>%
+  rename(value=Total_webs_by_country,
+         iso_a3= ISO3)
+#zeros don't work with the distortion
+country_summary$value <-country_summary$value+1
+
 
 #-----------------------------------------------
 # Prepare base world map (excluding Antarctica)
 #-----------------------------------------------
-world_map <- ne_countries(returnclass = "sf") %>%
-  select(gu_a3) %>%
-  filter(gu_a3 != "ATA") %>%
-  st_transform(crs = "+proj=robin")  # Robinson projection
 
+world_map <- ne_countries(returnclass = "sf") %>%
+  dplyr::select(iso_a3) %>%
+  dplyr::filter(iso_a3 != "ATA") %>%
+  st_transform(crs = "+proj=robin")
 #-----------------------------------------------
 # 1. Cartogram based on number of networks per country
 #-----------------------------------------------
-net.country <- webs %>%
-  count(ISO3)
 
-world_data1 <- left_join(world_map, net.country, by = c("gu_a3" = "ISO3"))
-world_data1[is.na(world_data1$n), "n"] <- 1  # Fill NAs with 1 to avoid zero-size countries
+world_data1 <- left_join(world_map, country_summary, by = c("iso_a3"))
 
-world_carto1 <- cartogram_cont(world_data1, "n", maxSizeError = 1.5)
-plot(world_carto1["n"])  # Plot cartogram with network count
+#world_data1[is.na(world_data1$value), "value"] <- 1  # Fill NAs with 1 to avoid zero-size countries
+
+world_carto1 <- cartogram_cont(world_data1[!is.na(world_data1$value),], "value", maxSizeError = .001)
+plot(world_carto1["value"])  # Plot cartogram with network count
 
 #-----------------------------------------------
 # 2. Cartogram based on number of bee species per country
 #-----------------------------------------------
-# Rename columns for easier use
-bees2 <- bees %>% select(ISO3, CL_Species)
 
-world_data2 <- left_join(world_map, bees2, by = c("gu_a3" = "ISO3")) %>%
-  na.omit()
-
-world_carto2 <- cartogram_cont(world_data2, "CL_Species", maxSizeError = 1.5)
+world_carto2 <- cartogram_cont(world_data1[!is.na(world_data1$CL_Species),], "CL_Species", maxSizeError = .001)
 plot(world_carto2["CL_Species"])
 
 #-----------------------------------------------
-# 3. Cartogram based on GDP in 2020
+# 3. Cartogram based on Proportional GDP 
 #-----------------------------------------------
-real.gdp <- gdp %>%
-  select(Country.Code, X2020)
 
-world_data3 <- left_join(world_map, real.gdp, by = c("gu_a3" = "Country.Code")) %>%
-  na.omit()
 
-world_carto3 <- cartogram_cont(world_data3, "X2020", maxSizeError = 1.5)
-plot(world_carto3["X2020"])
+world_carto3 <- cartogram_cont(world_data1[!is.na(world_data1$PropGDP_median),] , "PropGDP_median", maxSizeError = .001)
+plot(world_carto3["PropGDP_median"])
 
 #-----------------------------------------------
 # 4. Plot cartogram with ggplot2
@@ -340,10 +328,21 @@ plot(world_carto3["X2020"])
 # Custom color palette (orange to green)
 custom_palette <- c("#FFE5B4", "#FDB863", "#E08214", "#5AAE61", "#1B7837")
 
+
+# Shared guide settings
+legend_guide <- guide_colourbar(
+  direction = "horizontal",
+  title.position = "top",
+  title.hjust = 0.5,
+  label.hjust = 0.5,
+  barwidth = unit(50, "mm"),
+  barheight = unit(3, "mm")
+)
+
 # 1. Number of networks
 p1 <- ggplot(world_carto1) +
-  geom_sf(aes(fill = n), color = "gray20", linewidth = 0.2) +
-  scale_fill_gradientn(colors = custom_palette, name = "Number of networks") +
+  geom_sf(aes(fill = value), color = "gray20", linewidth = 0.2) +
+  scale_fill_gradientn(colors = custom_palette, name = "Number of networks", guide = legend_guide) +
   labs(x = "Longitude", y = NULL) +
   theme_classic(base_size = 13) +
   theme(
@@ -352,10 +351,11 @@ p1 <- ggplot(world_carto1) +
     legend.text = element_text(size = 10)
   )
 
+
 # 2. Research investment
 p2 <- ggplot(world_carto3) +
-  geom_sf(aes(fill = X2020), color = "gray20", linewidth = 0.2) +
-  scale_fill_gradientn(colors = custom_palette, name = "Research investment\n($ US Dollar)",
+  geom_sf(aes(fill = PropGDP_median), color = "gray20", linewidth = 0.2) +
+  scale_fill_gradientn(colors = custom_palette, name = "Research and development expenditure (% of GDP)", , guide = legend_guide,
                        labels = label_number(scale_cut = cut_short_scale())) +
   labs(x = "Longitude", y = NULL) +
   theme_classic(base_size = 13) +
@@ -365,10 +365,11 @@ p2 <- ggplot(world_carto3) +
     legend.text = element_text(size = 10)
   )
 
+
 # 3. Number of bee species
 p3 <- ggplot(world_carto2) +
   geom_sf(aes(fill = CL_Species), color = "gray20", linewidth = 0.2) +
-  scale_fill_gradientn(colors = custom_palette, name = "Number of bee species") +
+  scale_fill_gradientn(colors = custom_palette, name = "Number of bee species", guide = legend_guide) +
   labs(x = "Longitude", y = NULL) +
   theme_classic(base_size = 13) +
   theme(
@@ -378,7 +379,10 @@ p3 <- ggplot(world_carto2) +
   )
 
 
+# Combine the three plots vertically
+final_plot <- p1 / p2 / p3 
 
+ggsave(final_plot, file = paste0(savefilepath, "/combined_cartogram_maps.png"), width = 10, height = 15, dpi = 300)
 
 
 
