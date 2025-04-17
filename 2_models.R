@@ -21,8 +21,8 @@ source("network-bias/src/initalize_models.R")
 webs_complete <- webs_complete[webs_complete$Continent != "Oceania",]
 
 webs_complete$Continent <- factor(webs_complete$Continent,
-                                 levels=c("Northern America",
-                                          "Southern America",
+                                 levels=c("North America",
+                                          "South America",
                                           "Africa",
                                           "Europe",
                                           "Asia"))

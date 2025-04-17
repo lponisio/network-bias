@@ -46,8 +46,8 @@ savefilepath <- c("network-bias-saved/manuscript/figures")
 webs_complete <- webs[webs$Continent != "Oceania",]
 
 webs_complete$Continent <- factor(webs_complete$Continent,
-                                  levels=c("Northern America",
-                                           "Southern America",
+                                  levels=c("North America",
+                                           "South America",
                                            "Africa",
                                            "Europe",
                                            "Asia"))
@@ -171,7 +171,7 @@ yearly_counts <- webs_reuse %>%
   group_by(Publi_Year, Continent, Status) %>%
   summarise(count = n(), .groups = "drop")
 
-ggplot(yearly_counts, aes(x = Publi_Year, y = count, color = Status)) +
+reuse <- ggplot(yearly_counts, aes(x = Publi_Year, y = count, color = Status)) +
   geom_line() +
   geom_point() +
   scale_color_manual(values = c("Original" = "#1b9e77", "Reused" = "#d95f02")) +  # Match colors
@@ -190,6 +190,8 @@ ggplot(yearly_counts, aes(x = Publi_Year, y = count, color = Status)) +
     panel.grid = element_blank(),  # remove gridlines
     panel.border = element_rect(color = "black", fill = NA)  # adds box with axes to every panel
   )
+ggsave(reuse, file = paste0(savefilepath, "/reuse.png"), width = 15, height = 10, dpi = 300)
+
 
 ## ***********************************************
 library(tidyverse)
