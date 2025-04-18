@@ -181,7 +181,7 @@ final <- final %>%
 
 ## need the gdp to convert proportion to $$
 # Select columns for the years 2000 to 2020 using the correct pattern
-year_columns <- grep("^X(200[0-9]|201[0-9]|2020)$", names(gdp))
+year_columns <- grep("^X(200[0-9]|201[0-9]|2023)$", names(gdp))
 
 # Calculate the row medians for those columns
 gdp$GDP.MEDIAN <- apply(gdp[, year_columns], 1, median, na.rm = TRUE)
@@ -208,9 +208,10 @@ res.inv <- res.inv[!res.inv$Country.Code %in% not.real.countries,]
 dim(res.inv)
 
 ## take the 20 year median
-year_columns <- grep("^X(200[0-9]|201[0-9]|2020)$", names(res.inv))
+year_columns <- grep("^X(200[0-9]|201[0-9]|2023)$", names(res.inv))
 
 res.inv$PropGDP_median <- apply(res.inv[, year_columns], 1, median, na.rm = TRUE)
+
 
 ## research $ data but no web data officially collected
 ## countries with res investment data but no webs
