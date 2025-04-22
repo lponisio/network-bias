@@ -41,15 +41,26 @@ col_keep <- c("Web_Code", "webs_reuse_count", "Publi_Year","LAT", "LONG", "Regio
 webs <- webs[, col_keep, drop = FALSE]
 
 # Standardize and validate country names
-length(unique(webs$Country))
+x <-unique(webs$Country)
 
 webs$Country <- countrycode(as.character(webs$Country), 
                                          origin = "country.name", destination = "country.name")
-length(unique(webs$Country))
+y<- unique(webs$Country)
+
+setdiff(x,y)
+setdiff(y,x)
+
 
 #making sure the ISO3 is standardized
+x <-unique(webs$ISO3)
 webs$ISO3 <- countrycode(as.character(webs$Country), 
                           origin = "country.name", destination = "iso3c")
+
+y<- unique(webs$ISO3)
+
+setdiff(x,y)
+setdiff(y,x)
+
 
 ## ## webs without countries, nothing we can do here
 dim(webs)
@@ -78,9 +89,6 @@ names(webs)[names(webs) == "ISO3"] <- "adm0_a3"
 
 final <- left_join(webs, countries, by = "adm0_a3")
 
-
-
-
 ## ***********************************************
 #count up the webs in each Country
 web_country <- webs %>%
@@ -92,9 +100,6 @@ web_country <- webs %>%
 
 #this is so you can just subset the original dataframe later on
 final <- left_join(web_country, final, by = "adm0_a3")
-
-
-#new column for economic IS03
 
 
 ## ***********************************************
@@ -121,8 +126,6 @@ gdp <- gdp[!gdp$Country.Code %in% not.real.countries,]
 dim(gdp)
 
 
-
-
 ## need the gdp to convert proportion to $$
 # Select columns for the years 2000 to 2020 using the correct pattern
 year_columns <- grep("^X(200[0-9]|201[0-9]|2023)$", names(gdp))
@@ -138,8 +141,8 @@ dim(gdp)
 
 
 # Handle missing values in `Biome_WWF`
-final$Biome_WWF[final$Biome_WWF == "#N/A"] <- NA
-final <- final[!is.na(final$Biome_WWF),]
+#final$Biome_WWF[final$Biome_WWF == "#N/A"] <- NA
+#final <- final[!is.na(final$Biome_WWF),]
 
 ## countries with gdp data but no webs
 no.webs <- data.frame(ISO3 = unique(gdp$Country.Code[!gdp$Country.Code %in% final$ISO3]))
@@ -172,13 +175,15 @@ final <- final %>%
 
 ## ***********************************************
 #Assing contintents to countries where the data is missing
-final$Continent <- countrycode(sourcevar = final$ISO3, 
+final$Continent <- countrycode(sourcevar = final$adm0_a3, 
                                       origin = "iso3c", 
                                       destination = "continent")
 
-#it can't recgonize the continent for these
-final[final$ISO3 == "TMN",]$Continent == "Asia"
-final[final$ISO3 == "XKX",]$Continent == "Europe"
+final[final$adm0_a3 == "TMN", "Continent"] <- "Asia"
+final[final$adm0_a3 == "XKX", "Continent"] <- "Europe"
+final[final$adm0_a3 == "VIR", "Continent"] <- "North America"
+final[final$adm0_a3 == "MAF", "Continent"] <- "North America"
+final[final$adm0_a3 == "CHI", "Continent"] <- "South America"
 
 ## ***********************************************
 #assigning hemisphere to countries with no webs, therefore no assigned hemisphere
@@ -286,9 +291,9 @@ final$ResInvestTotal <- final$PropGDP_median*final$GDP.MEDIAN
 print(unique(final$ISO3[is.na(final$GDP.MEDIAN)]))
 
 ## drop NAs DO WE WANT TO BE DOING THIS???
-dim(final)
-final <- final[!is.na(final$ResInvestTotal),]
-dim(final)
+# dim(final)
+# final <- final[!is.na(final$ResInvestTotal),]
+# dim(final)
 
 ## high and low values of research investment
 ## USA
@@ -434,6 +439,7 @@ final <- final %>%
                                    "South America", 
                                    Continent)))
 
+
 ## ***********************************************
 ## Density
 ## ***********************************************
@@ -452,7 +458,8 @@ final <- left_join(final, densities, by = "ISO3")
 final$ResInvs_Density <- final$ResInvestTotal/ final$AREA_by_ISO3
 
   
-  
+final[is.na(final$Continent),]
+
 ## ***********************************************
 write.csv(final, file = "saved/webs_complete.csv")
 
