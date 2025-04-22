@@ -21,7 +21,7 @@ webs <- left_join(webs, webs_reuse_count, by = "Web_Code")
 
 #around 70 networks that were in the previous webs_reuse csv are not in the updated one
 #this is to carry over that column
-webs1 <- webs %>%
+webs <- webs %>%
   mutate(webs_reuse_count = if_else(is.na(webs_reuse_count), Use_Frequency - 1, webs_reuse_count))
 
 
