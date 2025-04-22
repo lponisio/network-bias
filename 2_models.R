@@ -29,27 +29,36 @@ webs_complete$Continent <- factor(webs_complete$Continent,
 
 
 webs_country <- webs_complete %>%
-  distinct(ISO3, .keep_all = TRUE) %>%
+  distinct(adm0_a3, .keep_all = TRUE) %>%
   filter(!is.na(Continent) & 
            !is.na(AREA) & 
            !is.na(PropGDP_median) & 
            !is.na(CL_Species))
 
 
+
+
 # Ensure the dataset contains the required transformed variables
-webs_country$log_AREA <- scale(log(webs_country$AREA))
-webs_country$log_PropGDP_median <- scale(log(webs_country$PropGDP_median))
-webs_country$log_CL_Species <- scale(log(webs_country$CL_Species))
+webs_country$log_AREA <- datawizard::standardize(log(webs_country$AREA))
+webs_country$log_PropGDP_median <- datawizard::standardize(log(webs_country$PropGDP_median))
+webs_country$log_CL_Species <- datawizard::standardize(log(webs_country$CL_Species))
+webs_country$log_CL_Species_density <- datawizard::standardize(log(webs_country$CL_Species_Density))
+webs_country$log_ResInvs_Density <- datawizard::standardize(log(webs_country$ResInvs_Density))
+
+
+hist(webs_country$log_ResInvs_Density)
+hist(webs_country$log_CL_Species_density)
+
 
 M1 <- glm.nb(Total_webs_by_country ~ Continent +
-                     log_AREA +
-                     log_PropGDP_median +
-                     log_CL_Species,
-                   #family = nbinom2,
-                   data = webs_country)
+                    log_AREA +
+                    log_ResInvs_Density +
+                    log_CL_Species_density,
+                    data = webs_country)
 
 summary(M1)
 check_model(M1)
+
 
 
 boot_fun <- function(model, data) {

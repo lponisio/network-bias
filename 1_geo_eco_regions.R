@@ -13,9 +13,16 @@ webs_reuse_count <- webs_reuse%>%
   group_by(Web_Code)%>%
   summarise(webs_reuse_count = n()-1)
 
+
 webs_reuse_count
 
-webs <- merge(webs_reuse_count, webs)
+#webs <- merge(webs_reuse_count, webs)
+webs <- left_join(webs, webs_reuse_count, by = "Web_Code")
+
+#around 70 networks that were in the previous webs_reuse csv are not in the updated one
+#this is to carry over that column
+webs1 <- webs %>%
+  mutate(webs_reuse_count = if_else(is.na(webs_reuse_count), Use_Frequency - 1, webs_reuse_count))
 
 
 ## ***********************************************
@@ -46,22 +53,43 @@ dim(webs)
 
 
 ## ***********************************************
-#This was at a lower step in the pipeline but I moved it up to avoid errors
-## because Greenland is a territory of Denmark, the gdp we would like
-## to consider is the Danish GDP
-webs[webs$ISO3 == "GRL",]$ISO3 <- "DNK"
+#really cool way to handle colonies or sovereignt states!
+#I added a new column, one for the sovereignt (iso3c)or the colonial country
+#and one for the colony (admin or adm0_a3)
+
+library(rnaturalearth)
+library(dplyr)
+
+# Load countries with sovereignty info
+countries <- rnaturalearth::ne_countries(returnclass = "sf") %>%
+  st_drop_geometry() %>%
+  dplyr::select(sovereignt, admin,  adm0_a3)%>%
+  mutate(
+    ISO3 = countrycode(sovereignt, origin = 'country.name', destination = 'iso3c'))
+  
+  
+names(webs)[names(webs) == "ISO3"] <- "adm0_a3"
+
+final <- left_join(webs, countries, by = "adm0_a3")
+
+
+
 
 ## ***********************************************
 #count up the webs in each Country
-final <- webs %>%
-  group_by(ISO3)%>%
+web_country <- webs %>%
+  group_by(adm0_a3)%>%
   summarise(Total_webs_by_country = n())
 
 ## ## all should have a country code now
-(final$ISO3)[!(final$ISO3) %in% gdp$Country.Code]
+(final$adm0_a3)[!(final$adm0_a3) %in% gdp$Country.Code]
 
 #this is so you can just subset the original dataframe later on
-final <- merge(final, webs)
+final <- left_join(web_country, final, by = "adm0_a3")
+
+
+#new column for economic IS03
+
 
 ## ***********************************************
 ## join the web data with the gdp data
@@ -86,10 +114,22 @@ dim(gdp)
 gdp <- gdp[!gdp$Country.Code %in% not.real.countries,]
 dim(gdp)
 
+
+
+
+## need the gdp to convert proportion to $$
+# Select columns for the years 2000 to 2020 using the correct pattern
+year_columns <- grep("^X(200[0-9]|201[0-9]|2023)$", names(gdp))
+
+# Calculate the row medians for those columns
+gdp$GDP.MEDIAN <- apply(gdp[, year_columns], 1, median, na.rm = TRUE)
+
+
 ## remove countries with NA gdp
 dim(gdp)
-gdp <- gdp[!is.na(gdp$'X2020'),]
+gdp <- gdp[!is.na(gdp$GDP.MEDIAN),]
 dim(gdp)
+
 
 # Handle missing values in `Biome_WWF`
 final$Biome_WWF[final$Biome_WWF == "#N/A"] <- NA
@@ -97,6 +137,8 @@ final <- final[!is.na(final$Biome_WWF),]
 
 ## countries with gdp data but no webs
 no.webs <- data.frame(ISO3 = unique(gdp$Country.Code[!gdp$Country.Code %in% final$ISO3]))
+
+
 
 ## this is real data, there are no webs from these countries, so
 ## create 0 count data and add them to the data
@@ -117,6 +159,10 @@ no.webs <- no.webs[, colnames(final)]
 
 # Now use rbind to combine the rows
 final <- rbind(final, no.webs)
+
+
+final <- final %>%
+  mutate(adm0_a3 = if_else(is.na(adm0_a3), ISO3, adm0_a3))
 
 ## ***********************************************
 #Assing contintents to countries where the data is missing
@@ -139,13 +185,13 @@ latitudes <- world_map %>%
   summarize(LAT = mean(lat, na.rm = TRUE))
 
 # Match country names to ISO3 codes
-latitudes$ISO3 <- countrycode(latitudes$region, origin = "country.name", destination = "iso3c")
+latitudes$adm0_a3 <- countrycode(latitudes$region, origin = "country.name", destination = "iso3c")
 
 # Drop NA values (countries that couldn't be matched)
-latitudes <- latitudes[!is.na(latitudes$ISO3), ]
+latitudes <- latitudes[!is.na(latitudes$adm0_a3), ]
 
 # Merge with your dataset
-final <- left_join(final, latitudes, by = "ISO3")
+final <- left_join(final, latitudes, by = "adm0_a3")
 
 ## ***********************************************
 # Assign hemisphere
@@ -179,12 +225,6 @@ final <- final %>%
 # dim(final)
 
 
-## need the gdp to convert proportion to $$
-# Select columns for the years 2000 to 2020 using the correct pattern
-year_columns <- grep("^X(200[0-9]|201[0-9]|2023)$", names(gdp))
-
-# Calculate the row medians for those columns
-gdp$GDP.MEDIAN <- apply(gdp[, year_columns], 1, median, na.rm = TRUE)
 
 # View the result
 head(gdp)
@@ -193,6 +233,9 @@ head(gdp)
 names(gdp)[names(gdp) == "Country.Code"] <- "ISO3"
 
 final <- left_join(final, gdp[, c("ISO3", "GDP.MEDIAN")], by = join_by(ISO3))
+
+final <- final %>%
+  mutate(ISO3 = if_else(is.na(ISO3), ISO3, ISO3))
 
 #high and low gdp values
 #USA
@@ -259,17 +302,20 @@ hist(log(final$ResInvestTotal),
 ## VAT= vatican, FM= micronesia
 area.richness <- area.richness[, c("NAME", "ISO3", "AREA", "CL_Species")]
 
+#switching the colonies back 
+
 dim(area.richness)
 area.richness <- area.richness[!area.richness$ISO3 %in% not.real.countries,]
 dim(area.richness)
 
 #counties with area richness in our data set
-length(area.richness[area.richness$ISO3 %in% final$ISO3,]$ISO3)
+length(area.richness[area.richness$NAME %in% final$adm0_a3,]$ISO3)
 
 #counties with area richness not in our data set
-length(unique(area.richness[!area.richness$ISO3 %in% final$ISO3,]$ISO3))
+length(unique(area.richness[!area.richness$NAME  %in% final$adm0_a3,]$ISO3))
 ####DOUBLE CHECK
 #does dropping 99 make sense?
+
 
 ## drop really small islands that are territories and would have been
 ## coded as part of the colonial empire
@@ -286,78 +332,83 @@ area.richness <-  area.richness[area.richness$ISO3 != "MDG",]
 ## drop Western Sahara "disputed territory"
 area.richness <-  area.richness[area.richness$ISO3 != "ESH",]
 
+
+#since this is by country not colonial power
+names(area.richness)[names(area.richness) == "ISO3"] <- "adm0_a3"
+
+
 ## merging networks and bee richness by country
-final <- left_join(final, area.richness, by = "ISO3")
+final <- left_join(final, area.richness, by = "adm0_a3")
 
 ## ***********************************************
 ## Biomes
 ## ***********************************************
-
-# Standardize biome names (uppercase and remove commas)
-biome.code$BiomeName <- toupper(gsub(",", "", biome.code$BiomeName))
-final$Biome_WWF <- toupper(gsub(",", "", final$Biome_WWF))
-
-# Correct biome name issues
-biome.code$BiomeName <- gsub("SCRUB", "SHRUB", biome.code$BiomeName)
-biome.code$BiomeName <- gsub("TEMPERATE CONIFER FORESTS", "TEMPERATE CONIFEROUS FORESTS", biome.code$BiomeName)
-biome.code$BiomeName <- gsub("MANGROVES", "MANGROVE", biome.code$BiomeName)
-
-# Handle missing values in `Biome_WWF`
-final$Biome_WWF[final$Biome_WWF == "#N/A"] <- NA
-
-# Find unmatched biome names
-unmatched_biomes <- setdiff(unique(final$Biome_WWF), biome.code$BiomeName)
-unmatched_biomes
-
-# Match Biome_WWF to BiomeCode
-final$BiomeCode <- biome.code$BIOME[match(final$Biome_WWF, biome.code$BiomeName)]
-
-## drop codes that are for missing data
-biomes <- biomes[biomes$BIOME %in% biome.code$BIOME,]
-
-# Ensure all geometries are valid
-biomes <- biomes %>%
-  mutate(geometry = st_make_valid(geometry))
-
-# Extract centroid latitudes for each geometry
-biomes <- biomes %>%
-  mutate(
-    hemisphere = ifelse(st_coordinates(st_centroid(geometry))[, 2] >= 0, 
-                        "Northern", 
-                        "Southern")
-    )
-
-# Summarize the data
-biome_area_summary <- biomes %>%
-  group_by(BIOME) %>%
-  summarize(
-    AREA_biome_north = sum(AREA[hemisphere == "Northern"], na.rm = TRUE),
-    AREA_biome_south = sum(AREA[hemisphere == "Southern"], na.rm = TRUE),
-    AREA_biome_total = sum(AREA, na.rm = TRUE), #biome,
-  )%>%
-  st_drop_geometry()
-
-
-names(biome_area_summary)[names(biome_area_summary) == "BIOME"] <- "BiomeCode"
-
-final <- left_join(final, biome_area_summary,by ="BiomeCode")
-
-final <- final %>%
-  mutate(area_by_hemisphere = case_when(
-    Hemisphere == "Northern" ~ AREA_biome_north,
-    Hemisphere == "Southern" ~ AREA_biome_south,
-    TRUE ~ NA_real_  # Handle any unexpected cases
-  )) %>%
-  dplyr::select(-AREA_biome_north, -AREA_biome_south)
-
-# Summarize the data
-webs_biome_hemi <- final %>%
-  filter(BiomeCode != "NA")%>%
-  group_by(BiomeCode, Hemisphere) %>%
-  summarize(Total_webs_by_biome_by_hemi = n()
-  )
-
-final <- left_join(final, webs_biome_hemi,by = c("BiomeCode", "Hemisphere"))
+# 
+# # Standardize biome names (uppercase and remove commas)
+# biome.code$BiomeName <- toupper(gsub(",", "", biome.code$BiomeName))
+# final$Biome_WWF <- toupper(gsub(",", "", final$Biome_WWF))
+# 
+# # Correct biome name issues
+# biome.code$BiomeName <- gsub("SCRUB", "SHRUB", biome.code$BiomeName)
+# biome.code$BiomeName <- gsub("TEMPERATE CONIFER FORESTS", "TEMPERATE CONIFEROUS FORESTS", biome.code$BiomeName)
+# biome.code$BiomeName <- gsub("MANGROVES", "MANGROVE", biome.code$BiomeName)
+# 
+# # Handle missing values in `Biome_WWF`
+# final$Biome_WWF[final$Biome_WWF == "#N/A"] <- NA
+# 
+# # Find unmatched biome names
+# unmatched_biomes <- setdiff(unique(final$Biome_WWF), biome.code$BiomeName)
+# unmatched_biomes
+# 
+# # Match Biome_WWF to BiomeCode
+# final$BiomeCode <- biome.code$BIOME[match(final$Biome_WWF, biome.code$BiomeName)]
+# 
+# ## drop codes that are for missing data
+# biomes <- biomes[biomes$BIOME %in% biome.code$BIOME,]
+# 
+# # Ensure all geometries are valid
+# biomes <- biomes %>%
+#   mutate(geometry = st_make_valid(geometry))
+# 
+# # Extract centroid latitudes for each geometry
+# biomes <- biomes %>%
+#   mutate(
+#     hemisphere = ifelse(st_coordinates(st_centroid(geometry))[, 2] >= 0, 
+#                         "Northern", 
+#                         "Southern")
+#     )
+# 
+# # Summarize the data
+# biome_area_summary <- biomes %>%
+#   group_by(BIOME) %>%
+#   summarize(
+#     AREA_biome_north = sum(AREA[hemisphere == "Northern"], na.rm = TRUE),
+#     AREA_biome_south = sum(AREA[hemisphere == "Southern"], na.rm = TRUE),
+#     AREA_biome_total = sum(AREA, na.rm = TRUE), #biome,
+#   )%>%
+#   st_drop_geometry()
+# 
+# 
+# names(biome_area_summary)[names(biome_area_summary) == "BIOME"] <- "BiomeCode"
+# 
+# final <- left_join(final, biome_area_summary,by ="BiomeCode")
+# 
+# final <- final %>%
+#   mutate(area_by_hemisphere = case_when(
+#     Hemisphere == "Northern" ~ AREA_biome_north,
+#     Hemisphere == "Southern" ~ AREA_biome_south,
+#     TRUE ~ NA_real_  # Handle any unexpected cases
+#   )) %>%
+#   dplyr::select(-AREA_biome_north, -AREA_biome_south)
+# 
+# # Summarize the data
+# webs_biome_hemi <- final %>%
+#   filter(BiomeCode != "NA")%>%
+#   group_by(BiomeCode, Hemisphere) %>%
+#   summarize(Total_webs_by_biome_by_hemi = n()
+#   )
+# 
+# final <- left_join(final, webs_biome_hemi,by = c("BiomeCode", "Hemisphere"))
 
 ## ***********************************************
 ## Years since published
@@ -378,7 +429,30 @@ final <- final %>%
                                    Continent)))
 
 ## ***********************************************
+## Density
+## ***********************************************
+#country level
+final$CL_Species_Density <- final$CL_Species/ final$AREA
+
+#sovergein level
+densities <- final %>%
+   distinct(adm0_a3, .keep_all = TRUE) %>%
+   group_by(ISO3) %>%
+   summarize(AREA_by_ISO3 =sum(AREA))
+
+final <- left_join(final, densities, by = "ISO3")
+
+
+final$ResInvs_Density <- final$ResInvestTotal/ final$AREA_by_ISO3
+
+  
+  
+## ***********************************************
 write.csv(final, file = "saved/webs_complete.csv")
+
+
+
+
 
 
 

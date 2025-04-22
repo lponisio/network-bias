@@ -93,7 +93,7 @@ res_inv <- ggplot(webs_country,
               se = TRUE) +
   scale_x_continuous(labels = function(x) round(exp(x)-1, 2)) +
   scale_y_continuous(labels = function(x) round(exp(x)-1)) + # Convert log-scale to original
-  labs(x = "Research Investment", y = "") +
+  labs(x = "R&D Expenditure (% of GDP)", y = "") +
   theme_classic()
 
 #Bee species
@@ -199,7 +199,7 @@ library(rnaturalearth)
 library(rnaturalearthdata)
 library(sf)
 
-webs[webs$Country == "Greenland",]$ISO3 <- "GRL"
+#webs[webs$Country == "Greenland",]$ISO3 <- "GRL"
 
 
 # Summarize number of networks per country
@@ -357,7 +357,7 @@ p1 <- ggplot(world_carto1) +
 # 2. Research investment
 p2 <- ggplot(world_carto3) +
   geom_sf(aes(fill = PropGDP_median), color = "gray20", linewidth = 0.2) +
-  scale_fill_gradientn(colors = custom_palette, name = "Research and development expenditure (% of GDP)", , guide = legend_guide,
+  scale_fill_gradientn(colors = custom_palette, name = "R&D Expenditure (% of GDP)", , guide = legend_guide,
                        labels = label_number(scale_cut = cut_short_scale())) +
   labs(x = "Longitude", y = NULL) +
   theme_classic(base_size = 13) +
