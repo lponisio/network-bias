@@ -112,6 +112,9 @@ webs_reuse <- webs_complete %>%
          years_since_pub<90)
 webs_reuse$webs_reuse_count
 
+webs_reuse$log_years_since_pub <- datawizard::standardize(log(webs_reuse$years_since_pub))
+
+
 
 library(MASS)
 M1_nb <- glm.nb(webs_reuse_count ~ Continent *years_since_pub, data = webs_reuse)
