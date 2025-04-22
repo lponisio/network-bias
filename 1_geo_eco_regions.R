@@ -19,6 +19,12 @@ webs_reuse_count
 #webs <- merge(webs_reuse_count, webs)
 webs <- left_join(webs, webs_reuse_count, by = "Web_Code")
 
+#saving and sending to E
+x <-webs[is.na(webs$webs_reuse_count),]
+
+write.csv(x, file = "cleaning/webs_missing_new_reuse.csv")
+
+
 #around 70 networks that were in the previous webs_reuse csv are not in the updated one
 #this is to carry over that column
 webs <- webs %>%
