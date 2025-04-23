@@ -54,7 +54,7 @@ webs_complete$Continent <- factor(webs_complete$Continent,
 
 
 webs_country <- webs_complete %>%
-  distinct(ISO3, .keep_all = TRUE) %>%
+  distinct(adm0_a3, .keep_all = TRUE) %>%
   filter(!is.na(Continent) & 
            !is.na(AREA) & 
            !is.na(PropGDP_median) & 
@@ -66,6 +66,7 @@ webs_country$log_AREA <- log(webs_country$AREA+1)
 webs_country$log_PropGDP_median <- log(webs_country$PropGDP_median+1)
 webs_country$log_CL_Species <- log(webs_country$CL_Species+1)
 webs_country$log_Total_webs_by_country <- log(webs_country$Total_webs_by_country+1)
+webs_country$log_ResInvs_Density <- log(webs_country$ResInvs_Density+1)
 
 ## ***********************************************
 
@@ -84,7 +85,7 @@ area <- ggplot(webs_country,
 
 #research invs by networks
 res_inv <- ggplot(webs_country,
-                  aes(x = log_PropGDP_median, y = log_Total_webs_by_country, color = Continent)) +
+                  aes(x = log_ResInvs_Density, y = log_Total_webs_by_country, color = Continent)) +
   geom_point() +
   scale_color_viridis(discrete = T) +
   geom_smooth(method = "glm",
@@ -93,7 +94,7 @@ res_inv <- ggplot(webs_country,
               se = TRUE) +
   scale_x_continuous(labels = function(x) round(exp(x)-1, 2)) +
   scale_y_continuous(labels = function(x) round(exp(x)-1)) + # Convert log-scale to original
-  labs(x = "R&D Expenditure (% of GDP)", y = "") +
+  labs(x = expression("Research investment density (USD/"* km^2 *")"), y = "") +
   theme_classic()
 
 #Bee species
@@ -107,7 +108,7 @@ bees <- ggplot(webs_country,
               se = TRUE, show.legend = FALSE) +
   scale_x_continuous(labels = function(x) round(exp(x)-1, -1)) + # Convert log-scale to original
   scale_y_continuous(labels = function(x) round(exp(x)-1, -1)) + 
-  labs(x = "Bee Species Richness", y = "") +
+  labs(x = expression("Bee species richness"), y = "") +
   theme_classic()   # Move legend to bottom
 
 library(patchwork)
@@ -168,6 +169,7 @@ reuse
 webs_reuse$Status <- ifelse(webs_reuse$webs_reuse_count > 0, "Reused", "Original")
 
 yearly_counts <- webs_reuse %>%
+  filter(!is.na(webs_reuse_count))%>%
   group_by(Publi_Year, Continent, Status) %>%
   summarise(count = n(), .groups = "drop")
 
@@ -201,12 +203,10 @@ library(sf)
 
 #webs[webs$Country == "Greenland",]$ISO3 <- "GRL"
 
-
 # Summarize number of networks per country
 country_summary <- webs %>%
-  distinct(ISO3, Total_webs_by_country) %>%
-  rename(value=Total_webs_by_country,
-         iso_a3= ISO3)
+  distinct(adm0_a3, Total_webs_by_country) %>%
+  rename(value=Total_webs_by_country)
 
 
 # Load world map as an sf object
@@ -214,11 +214,14 @@ world <- ne_countries(scale = "medium", returnclass = "sf")
 
 # Merge your ISO3 summary data to the world map
 world_with_data <- world %>%
-  left_join(country_summary, by = "iso_a3")
+  left_join(country_summary, by = "adm0_a3")
 
+world_with_data[is.na(world_with_data$value),]$adm0_a3
 
 coor <- webs %>%
-  filter(!is.na(LAT.x) & !is.na(LAT.y)) %>%
+  filter(!is.na(LAT.x),
+         !is.na(LAT.y),
+         !is.na(webs_reuse_count)) %>%
   rename(lat = LAT.x, lon = LONG, Use_Frequency = webs_reuse_count) %>%
   st_as_sf(coords = c("lon", "lat"), crs = 4326)  # convert to sf points
 
@@ -227,11 +230,12 @@ map_net <- ggplot() +
   geom_sf(data = world_with_data, aes(fill = value), color = "white", size = 0.1) +
   
   # Add your points on top
-  geom_sf(data = coor, aes(color = Use_Frequency), size = 2, alpha = 0.9) +
+  geom_sf(data = coor, color = "black", size = 1.6, alpha = 0.9) +
+  geom_sf(data = coor, aes(color = Use_Frequency), size = 1.5, alpha = 0.9) +
   
   # Fill scale
   scale_fill_gradientn(
-    colours = c("#D9F0D3", "#A6DBA0", "#5AAE61", "#1B7837"),
+    colours = c("#EDF8E9", "#5AAE61", "#1B7837"),
     name = "Number of networks",
     guide = guide_colourbar(
       direction = "horizontal",
@@ -264,13 +268,41 @@ map_net <- ggplot() +
   
   theme_classic() +
   theme(
-    legend.position = "bottom",
+    legend.box = "vertical",
+    
     axis.text = element_text(size = 10),
     axis.title = element_text(size = 16, face = "bold"),
     legend.text = element_text(size = 10),
     legend.title = element_text(size = 12, face = "bold"),
+    plot.margin = margin(1, 100, 1, 1)
+  )
+
+map_net
+ggsave(map_net, file = paste0(savefilepath, "/map_net.png"), width = 15, height = 6, dpi = 500)
+
+
+#-----------------------------------------------
+#just Europe
+map_europe <- ggplot() +
+  geom_sf(data = world_with_data, aes(fill = value), color = "white", size = 0.1) +
+  geom_sf(data = coor, color = "black", size = 2.5, alpha = 0.9) +
+  geom_sf(data = coor, aes(color = Use_Frequency), size = 2, alpha = 0.9) +
+  scale_fill_gradientn(colours = c("#D9F0D3", "#A6DBA0", "#5AAE61", "#1B7837")) +
+  scale_color_gradientn(colours = c("#FFE5B4", "#FDB863", "#E08214", "#B35806")) +
+  coord_sf(xlim = c(-15, 40), ylim = c(35, 70), expand = FALSE) +  # <-- zoomed-in coords
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.text = element_text(size = 10),
+    axis.title = element_text(size = 16, face = "bold"),
+    #legend.text = element_text(size = 10),
+    #legend.title = element_text(size = 12, face = "bold"),
     plot.margin = margin(5, 5, 5, 5)
   )
+
+ggsave(map_europe, file = paste0(savefilepath, "/map_net_europe.png"), width = 5, height = 5, dpi = 300)
+
+
 
 
 #-----------------------------------------------
@@ -282,9 +314,8 @@ map_net <- ggplot() +
 
 # Summarize number of networks per country
 country_summary <- webs %>%
-  distinct(ISO3, Total_webs_by_country, CL_Species, PropGDP_median) %>%
-  rename(value=Total_webs_by_country,
-         iso_a3= ISO3)
+  distinct(adm0_a3, Total_webs_by_country, CL_Species, ResInvs_Density) %>%
+  rename(value=Total_webs_by_country)
 #zeros don't work with the distortion
 country_summary$value <-country_summary$value+1
 
@@ -294,14 +325,13 @@ country_summary$value <-country_summary$value+1
 #-----------------------------------------------
 
 world_map <- ne_countries(returnclass = "sf") %>%
-  dplyr::select(iso_a3) %>%
-  dplyr::filter(iso_a3 != "ATA") %>%
+  dplyr::select(adm0_a3) %>%
   st_transform(crs = "+proj=robin")
 #-----------------------------------------------
 # 1. Cartogram based on number of networks per country
 #-----------------------------------------------
 
-world_data1 <- left_join(world_map, country_summary, by = c("iso_a3"))
+world_data1 <- left_join(world_map, country_summary, by = c("adm0_a3"))
 
 #world_data1[is.na(world_data1$value), "value"] <- 1  # Fill NAs with 1 to avoid zero-size countries
 
@@ -320,8 +350,8 @@ plot(world_carto2["CL_Species"])
 #-----------------------------------------------
 
 
-world_carto3 <- cartogram_cont(world_data1[!is.na(world_data1$PropGDP_median),] , "PropGDP_median", maxSizeError = .001)
-plot(world_carto3["PropGDP_median"])
+world_carto3 <- cartogram_cont(world_data1[!is.na(world_data1$ResInvs_Density),] , "ResInvs_Density", maxSizeError = .0001)
+plot(world_carto3["ResInvs_Density"])
 
 #-----------------------------------------------
 # 4. Plot cartogram with ggplot2
@@ -356,8 +386,8 @@ p1 <- ggplot(world_carto1) +
 
 # 2. Research investment
 p2 <- ggplot(world_carto3) +
-  geom_sf(aes(fill = PropGDP_median), color = "gray20", linewidth = 0.2) +
-  scale_fill_gradientn(colors = custom_palette, name = "R&D Expenditure (% of GDP)", , guide = legend_guide,
+  geom_sf(aes(fill = ResInvs_Density), color = "gray20", linewidth = 0.2) +
+  scale_fill_gradientn(colors = custom_palette, name = "ResInvs_Density", , guide = legend_guide,
                        labels = label_number(scale_cut = cut_short_scale())) +
   labs(x = "Longitude", y = NULL) +
   theme_classic(base_size = 13) +

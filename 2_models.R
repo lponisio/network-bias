@@ -32,8 +32,8 @@ webs_country <- webs_complete %>%
   distinct(adm0_a3, .keep_all = TRUE) %>%
   filter(!is.na(Continent) & 
            !is.na(AREA) & 
-           !is.na(PropGDP_median) & 
-           !is.na(CL_Species))
+           !is.na(ResInvs_Density) & 
+           !is.na(CL_Species_Density))
 
 
 
@@ -50,9 +50,9 @@ hist(webs_country$log_ResInvs_Density)
 hist(webs_country$log_CL_Species_density)
 
 
-M1 <- glm.nb(Total_webs_by_country ~ Continent +
-                    log_AREA +
+M1 <- glm.nb(Total_webs_by_country ~ Continent+
                     log_ResInvs_Density +
+                    log_AREA +
                     log_CL_Species_density,
                     data = webs_country)
 
@@ -109,7 +109,8 @@ boot_ci
 ## ***********************************************
 webs_reuse <- webs_complete %>%
   filter(!is.na(years_since_pub),
-         years_since_pub<90)
+         years_since_pub<90,
+         !is.na(webs_reuse_count))
 webs_reuse$webs_reuse_count
 
 webs_reuse$log_years_since_pub <- datawizard::standardize(log(webs_reuse$years_since_pub))
