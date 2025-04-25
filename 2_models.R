@@ -18,7 +18,9 @@ source("network-bias/src/initalize_models.R")
 # variables. We included an interaction with each of these variables and continent 
 # to allow their slopes to vary by continent.  
 ## ***********************************************
-webs_complete <- webs_complete[webs_complete$Continent != "Oceania",]
+
+webs_complete <- webs_complete[!webs_complete$Continent 
+                               %in% c("Oceania", "Seven seas (open ocean)"), ]
 
 webs_complete$Continent <- factor(webs_complete$Continent,
                                  levels=c("North America",
@@ -36,6 +38,9 @@ webs_country <- webs_complete %>%
            !is.na(CL_Species_Density))
 
 
+not_in_analysis <- setdiff(unique(webs_complete$adm0_a3), unique(webs_country$adm0_a3))
+
+countrycode(not_in_analysis, origin = "iso3c", destination = "country.name")
 
 
 # Ensure the dataset contains the required transformed variables
@@ -60,35 +65,35 @@ summary(M1)
 check_model(M1)
 
 
-
-boot_fun <- function(model, data) {
-  # Extract fitted values (mu) and dispersion parameter (theta)
-  mu <- fitted(model)  # Mean of the negative binomial distribution
-  theta <- model$theta  # Dispersion parameter
-  
-  # Simulate new response values using the negative binomial distribution
-  sim_response <- rnbinom(n = length(mu), size = theta, mu = mu)
-  
-  # Replace the response column with the simulated data
-  data$Total_webs_by_country <- sim_response
-  
-  # Fit the model to the simulated data
-  sim_model <- update(model, data = data)
-  
-  # Return the coefficients from the simulated model
-  return(coef(sim_model))
-}
-
-
-n_iter <- 1000  # Number of bootstrap iterations
-boot_results <- replicate(n_iter, boot_fun(M1, webs_country))
-
-
-
-boot_results_df <- as.data.frame(t(boot_results))
-colnames(boot_results_df) <- names(coef(M1))  # Assign coefficient names
-boot_ci <- apply(boot_results_df, 2, function(x) quantile(x, probs = c(0.025, 0.975)))  # 95% CI
-boot_ci
+# 
+# boot_fun <- function(model, data) {
+#   # Extract fitted values (mu) and dispersion parameter (theta)
+#   mu <- fitted(model)  # Mean of the negative binomial distribution
+#   theta <- model$theta  # Dispersion parameter
+#   
+#   # Simulate new response values using the negative binomial distribution
+#   sim_response <- rnbinom(n = length(mu), size = theta, mu = mu)
+#   
+#   # Replace the response column with the simulated data
+#   data$Total_webs_by_country <- sim_response
+#   
+#   # Fit the model to the simulated data
+#   sim_model <- update(model, data = data)
+#   
+#   # Return the coefficients from the simulated model
+#   return(coef(sim_model))
+# }
+# 
+# 
+# n_iter <- 1000  # Number of bootstrap iterations
+# boot_results <- replicate(n_iter, boot_fun(M1, webs_country))
+# 
+# 
+# 
+# boot_results_df <- as.data.frame(t(boot_results))
+# colnames(boot_results_df) <- names(coef(M1))  # Assign coefficient names
+# boot_ci <- apply(boot_results_df, 2, function(x) quantile(x, probs = c(0.025, 0.975)))  # 95% CI
+# boot_ci
 
 
 
@@ -109,7 +114,7 @@ boot_ci
 ## ***********************************************
 webs_reuse <- webs_complete %>%
   filter(!is.na(years_since_pub),
-         years_since_pub<90,
+         #years_since_pub<90,
          !is.na(webs_reuse_count))
 webs_reuse$webs_reuse_count
 
@@ -122,36 +127,36 @@ M1_nb <- glm.nb(webs_reuse_count ~ Continent *years_since_pub, data = webs_reuse
 summary(M1_nb)
 performance::check_model(M1_nb)
 
-
-boot_fun <- function(model, data) {
-  # Extract fitted values (mu) and dispersion parameter (theta)
-  mu <- fitted(model)  # Mean of the negative binomial distribution
-  theta <- model$theta  # Dispersion parameter
-  
-  # Simulate new response values using the negative binomial distribution
-  sim_response <- rnbinom(n = length(mu), size = theta, mu = mu)
-  
-  # Replace the response column with the simulated data
-  data$Use_Frequency <- sim_response
-  
-  # Fit the model to the simulated data
-  sim_model <- update(model, data = data)
-  
-  # Return the coefficients from the simulated model
-  return(coef(sim_model))
-}
-
-n_iter <- 1000  # Number of bootstrap iterations
-boot_results <- replicate(n_iter, boot_fun(M1_nb, webs_reuse))
-
-
-
-
-
-boot_results_df <- as.data.frame(t(boot_results))
-colnames(boot_results_df) <- names(coef(M1_nb))  # Assign coefficient names
-boot_ci <- apply(boot_results_df, 2, function(x) quantile(x, probs = c(0.025, 0.975)))  # 95% CI
-boot_ci
+# 
+# boot_fun <- function(model, data) {
+#   # Extract fitted values (mu) and dispersion parameter (theta)
+#   mu <- fitted(model)  # Mean of the negative binomial distribution
+#   theta <- model$theta  # Dispersion parameter
+#   
+#   # Simulate new response values using the negative binomial distribution
+#   sim_response <- rnbinom(n = length(mu), size = theta, mu = mu)
+#   
+#   # Replace the response column with the simulated data
+#   data$Use_Frequency <- sim_response
+#   
+#   # Fit the model to the simulated data
+#   sim_model <- update(model, data = data)
+#   
+#   # Return the coefficients from the simulated model
+#   return(coef(sim_model))
+# }
+# 
+# n_iter <- 1000  # Number of bootstrap iterations
+# boot_results <- replicate(n_iter, boot_fun(M1_nb, webs_reuse))
+# 
+# 
+# 
+# 
+# 
+# boot_results_df <- as.data.frame(t(boot_results))
+# colnames(boot_results_df) <- names(coef(M1_nb))  # Assign coefficient names
+# boot_ci <- apply(boot_results_df, 2, function(x) quantile(x, probs = c(0.025, 0.975)))  # 95% CI
+# boot_ci
 
 ## ***********************************************
 

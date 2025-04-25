@@ -82,6 +82,9 @@ names(countries)[names(countries) == "continent"] <- "Continent"
 
 final <- left_join(webs, countries, by = "adm0_a3")
 
+
+
+
 ## ***********************************************
 #count up the webs in each Country
 web_country <- webs %>%
@@ -134,25 +137,7 @@ final <- final %>%
   mutate(ISO3 = if_else(is.na(ISO3), adm0_a3, ISO3))
 
 
-## ***********************************************
-# drop the codes for regions, and country groupings
-## also drop North Korea because they don't report well
-not.real.countries <- c("")
-#not.real.countries <- c("WLD", "AFE", "AFW", "ARB", "CEB", "CSS", "EAP",
-#                        "EAR", "EAS", "ECA", "ECS", "EMU", "EUU",
-#                        "FCS", "HIC", "HPC", "IBD", "IBT", "IDA",
-#                        "IDB",
-#                        "IDX", "INX", "LAC", "LCN", "LDC", "LIC",
-#                        "LMC", "LMY", "LTE", "MEA", "MIC", "MNA",
-#                        "NAC", "OED", "OSS", "PRE", "PSE", "PSS",
-#                        "PST",
- #                       "SAS", "SSA", "SSF", "SST", "TEA", "TEC",
-#                        "TLA", "TMM", "TSA", "TSS", "UMC", "PRK",
-#                        "", "VAT")
 
-dim(final)
-final <- final[!final$adm0_a3 %in% not.real.countries,]
-dim(final)
 
 
 ## ***********************************************
@@ -163,13 +148,17 @@ world_map <- map_data("world")
 # Extract country names and latitudes
 latitudes <- world_map %>%
   group_by(region) %>%
-  summarize(LAT = mean(lat, na.rm = TRUE))
+  summarize(LAT_country = mean(lat, na.rm = TRUE))%>%
+  rename(region_world_map =region)
 
 # Match country names to ISO3 codes
-latitudes$adm0_a3 <- countrycode(latitudes$region, origin = "country.name", destination = "iso3c")
+latitudes$adm0_a3 <- countrycode(latitudes$region_world_map, origin = "country.name", destination = "iso3c")
 
 # Drop NA values (countries that couldn't be matched)
 latitudes <- latitudes[!is.na(latitudes$adm0_a3), ]
+
+latitudes<- latitudes %>%
+  distinct(adm0_a3, .keep_all = TRUE)
 
 # Merge with your dataset
 final <- left_join(final, latitudes, by = "adm0_a3")
@@ -177,16 +166,16 @@ final <- left_join(final, latitudes, by = "adm0_a3")
 ## ***********************************************
 # Assign hemisphere
 final <- final %>%
-  mutate(Hemisphere = ifelse(is.na(Hemisphere), ifelse(LAT.y >= 0, "Northern", "Southern"), Hemisphere))
+  mutate(Hemisphere = ifelse(is.na(Hemisphere), ifelse(LAT_country >= 0, "Northern", "Southern"), Hemisphere))
 
 # Check if any missing hemispheres remain
 sum(is.na(final$Hemisphere))
 
 ## ***********************************************
 
-dim(gdp)
-gdp <- gdp[!gdp$Country.Code %in% not.real.countries,]
-dim(gdp)
+#dim(gdp)
+#gdp <- gdp[!gdp$Country.Code %in% not.real.countries,]
+#dim(gdp)
 
 
 ## need the gdp to convert proportion to $$
@@ -213,12 +202,14 @@ final <- left_join(final, gdp[, c("ISO3", "GDP.MEDIAN")], by = join_by(ISO3))
 
 hist(final$GDP.MEDIAN)
 
+
+
 ## ***********************************************
 ## research investment by country
 ## ***********************************************
-dim(res.inv)
-res.inv <- res.inv[!res.inv$Country.Code %in% not.real.countries,]
-dim(res.inv)
+#dim(res.inv)
+#res.inv <- res.inv[!res.inv$Country.Code %in% not.real.countries,]
+#dim(res.inv)
 
 ## take the 20 year median
 year_columns <- grep("^X(200[0-9]|201[0-9]|2023)$", names(res.inv))
@@ -247,9 +238,9 @@ hist(log(final$ResInvestTotal),
 ## VAT= vatican, FM= micronesia
 area.richness <- area.richness[, c("NAME", "ISO3", "AREA", "CL_Species")]
 
-dim(area.richness)
-area.richness <- area.richness[!area.richness$ISO3 %in% not.real.countries,]
-dim(area.richness)
+#dim(area.richness)
+#area.richness <- area.richness[!area.richness$ISO3 %in% not.real.countries,]
+#dim(area.richness)
 
 ## drop really small islands that are territories and would have been
 ## coded as part of the colonial empire
@@ -287,7 +278,59 @@ final <- left_join(final, densities, by = "ISO3")
 final$ResInvs_Density <- final$ResInvestTotal/ final$AREA_by_ISO3
 
   
-drop <-final[is.na(final$ISO3),]
+
+
+
+## ***********************************************
+# drop the codes for regions, and country groupings
+## also drop North Korea because they don't report well
+not.real.countries <- c("PRK", "")
+#not.real.countries <- c("WLD", "AFE", "AFW", "ARB", "CEB", "CSS", "EAP",
+#                        "EAR", "EAS", "ECA", "ECS", "EMU", "EUU",
+ #                       "FCS", "HIC", "HPC", "IBD", "IBT", "IDA",
+#                        "IDB",
+#                        "IDX", "INX", "LAC", "LCN", "LDC", "LIC",
+#                        "LMC", "LMY", "LTE", "MEA", "MIC", "MNA",
+#                        "NAC", "OED", "OSS", "PRE", "PSE", "PSS",
+#                        "PST",
+#                        "SAS", "SSA", "SSF", "SST", "TEA", "TEC",
+#                        "TLA", "TMM", "TSA", "TSS", "UMC", "PRK",
+#                        "", "VAT")
+
+
+#only korea is dropped
+dim(final)
+final <- final[!final$adm0_a3 %in% not.real.countries,]
+dim(final)
+
+
+
+unique(final[is.na(final$Continent),]$adm0_a3)
+
+
+
+# Dominica (DMA) and Grenada (GRD) are island nations located in the Caribbean. 
+# Although they're islands, the Caribbean is typically considered part of the 
+# Americas, and in most global datasets—such as those from the United Nations or
+# the World Bank—Caribbean countries are grouped under North America for 
+# continental classification. On the other hand, Mauritius (MUS) and Seychelles
+# (SYC) are island nations situated in the Indian Ocean, off the eastern coast of
+# Africa. Despite their insular geography, they are considered part of Africa in 
+# geopolitical and geographic classifications, and are members of African regional
+# organizations such as the African Union.
+
+final <- final %>%
+  mutate(
+    Continent = case_when(
+      adm0_a3 == "DMA" ~ "North America",
+      adm0_a3 == "GRD" ~ "North America",
+      adm0_a3 == "MUS" ~ "Africa",
+      adm0_a3 == "SYC" ~ "Africa",
+      TRUE ~ Continent  # keep existing continent values
+    )
+  )
+unique(final[is.na(final$Continent),]$adm0_a3)
+
 
 ## ***********************************************
 write.csv(final, file = "saved/webs_complete.csv")

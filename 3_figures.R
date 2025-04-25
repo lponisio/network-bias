@@ -225,27 +225,33 @@ coor <- webs %>%
   rename(lat = LAT.x, lon = LONG, Use_Frequency = webs_reuse_count) %>%
   st_as_sf(coords = c("lon", "lat"), crs = 4326)  # convert to sf points
 
+# First, make sure to assign a new column for custom fill
+world_with_data$fill_value <- ifelse(is.na(world_with_data$value), NA,
+                                     ifelse(world_with_data$value == 0, -1, world_with_data$value))
+
 map_net <- ggplot() +
-  # Base world map with fill by number of networks
-  geom_sf(data = world_with_data, aes(fill = value), color = "white", size = 0.1) +
+  # Base world map with custom fill
+  geom_sf(data = world_with_data, aes(fill = fill_value), color = "white", size = 0.1, na.rm = FALSE) +
   
-  # Add your points on top
-  geom_sf(data = coor, color = "black", size = 1.6, alpha = 0.9) +
-  geom_sf(data = coor, aes(color = Use_Frequency), size = 1.5, alpha = 0.9) +
+  # Points
+  geom_sf(data = coor, color = "black", size = 1.6) +
+  geom_sf(data = coor, aes(color = Use_Frequency), size = 1.5) +
   
-  # Fill scale
+  # Custom fill scale
   scale_fill_gradientn(
-    colours = c("#EDF8E9", "#5AAE61", "#1B7837"),
+    colours = c("grey", "#EDF8E9", "#5AAE61", "#1B7837"),
+    values = scales::rescale(c(-1, 1, max(world_with_data$fill_value, na.rm = TRUE))),
     name = "Number of networks",
+    na.value = "black",
     guide = guide_colourbar(
       direction = "horizontal",
-      barheight = unit(2, units = "mm"),
-      barwidth = unit(50, units = "mm"),
+      barheight = unit(2, "mm"),
+      barwidth = unit(50, "mm"),
       title.position = "top",
       title.hjust = 0.5,
       label.hjust = 0.5
     )
-  ) +
+  )+
   
   # Point color scale
   scale_color_gradientn(
@@ -284,11 +290,14 @@ ggsave(map_net, file = paste0(savefilepath, "/map_net.png"), width = 15, height 
 #-----------------------------------------------
 #just Europe
 map_europe <- ggplot() +
-  geom_sf(data = world_with_data, aes(fill = value), color = "white", size = 0.1) +
-  geom_sf(data = coor, color = "black", size = 2.5, alpha = 0.9) +
-  geom_sf(data = coor, aes(color = Use_Frequency), size = 2, alpha = 0.9) +
-  scale_fill_gradientn(colours = c("#D9F0D3", "#A6DBA0", "#5AAE61", "#1B7837")) +
-  scale_color_gradientn(colours = c("#FFE5B4", "#FDB863", "#E08214", "#B35806")) +
+  geom_sf(data = world_with_data, aes(fill = fill_value), color = "white", size = 0.1) +
+  geom_sf(data = coor, color = "black", size = 2.5) +
+  geom_sf(data = coor, aes(color = Use_Frequency), size = 2) +
+  scale_fill_gradientn(
+    colours = c("grey", "#EDF8E9", "#5AAE61", "#1B7837"),
+    values = scales::rescale(c(-1, 1, max(world_with_data$fill_value, na.rm = TRUE))),
+    na.value = "black")+
+    scale_color_gradientn(colours = c("#FFE5B4", "#FDB863", "#E08214", "#B35806")) +
   coord_sf(xlim = c(-15, 40), ylim = c(35, 70), expand = FALSE) +  # <-- zoomed-in coords
   theme_classic() +
   theme(
@@ -297,10 +306,10 @@ map_europe <- ggplot() +
     axis.title = element_text(size = 16, face = "bold"),
     #legend.text = element_text(size = 10),
     #legend.title = element_text(size = 12, face = "bold"),
-    plot.margin = margin(5, 5, 5, 5)
+    plot.margin = margin(10, 10, 10, 10)
   )
 
-ggsave(map_europe, file = paste0(savefilepath, "/map_net_europe.png"), width = 5, height = 5, dpi = 300)
+ggsave(map_europe, file = paste0(savefilepath, "/map_net_europe.png"), width = 6, height = 6, dpi = 300)
 
 
 
@@ -314,7 +323,10 @@ ggsave(map_europe, file = paste0(savefilepath, "/map_net_europe.png"), width = 5
 
 # Summarize number of networks per country
 country_summary <- webs %>%
-  distinct(adm0_a3, Total_webs_by_country, CL_Species, ResInvs_Density) %>%
+  distinct(adm0_a3, Total_webs_by_country, CL_Species, ResInvs_Density, ResInvestTotal) %>%
+  filter(!is.na(Total_webs_by_country) & 
+           !is.na(ResInvs_Density) & 
+           !is.na(CL_Species))  %>%
   rename(value=Total_webs_by_country)
 #zeros don't work with the distortion
 country_summary$value <-country_summary$value+1
@@ -348,10 +360,10 @@ plot(world_carto2["CL_Species"])
 #-----------------------------------------------
 # 3. Cartogram based on Proportional GDP 
 #-----------------------------------------------
+world_data1$ResInvestTotal_log <-log(world_data1$ResInvestTotal+1)
 
-
-world_carto3 <- cartogram_cont(world_data1[!is.na(world_data1$ResInvs_Density),] , "ResInvs_Density", maxSizeError = .0001)
-plot(world_carto3["ResInvs_Density"])
+world_carto3 <- cartogram_cont(world_data1[!is.na(world_data1$ResInvestTotal_log),] , "ResInvestTotal_log", maxSizeError = .0001)
+plot(world_carto3["ResInvestTotal_log"])
 
 #-----------------------------------------------
 # 4. Plot cartogram with ggplot2
@@ -386,8 +398,8 @@ p1 <- ggplot(world_carto1) +
 
 # 2. Research investment
 p2 <- ggplot(world_carto3) +
-  geom_sf(aes(fill = ResInvs_Density), color = "gray20", linewidth = 0.2) +
-  scale_fill_gradientn(colors = custom_palette, name = "ResInvs_Density", , guide = legend_guide,
+  geom_sf(aes(fill = ResInvestTotal_log), color = "gray20", linewidth = 0.2) +
+  scale_fill_gradientn(colors = custom_palette, name = "Total research investment (log)", , guide = legend_guide,
                        labels = label_number(scale_cut = cut_short_scale())) +
   labs(x = "Longitude", y = NULL) +
   theme_classic(base_size = 13) +
