@@ -17,20 +17,14 @@ webs_reuse_count <- webs_reuse%>%
   group_by(Web_Code)%>%
   summarise(webs_reuse_count = n()-1)
 
-webs_reuse_count
-
 #webs <- merge(webs_reuse_count, webs)
 webs <- left_join(webs, webs_reuse_count, by = "Web_Code")
-
-#saving and sending to E
-x <-webs[is.na(webs$webs_reuse_count),]
-write.csv(x, file = "cleaning/webs_missing_new_reuse.csv")
 
 
 ## ***********************************************
 #columns to keep 
 col_keep <- c("Web_Code", "webs_reuse_count", "Publi_Year","LAT", "LONG", "Region",
-              "Country", "ISO3", "Hemisphere","Biome_WWF")
+              "Continent", "ISO3", "Hemisphere", "Country")
 
 # Keep only the specified columns
 webs <- webs[, col_keep, drop = FALSE]
@@ -63,8 +57,63 @@ webs <- webs %>% filter(!is.na(Country) & Country != "",
                         !is.na(ISO3) & ISO3 != "")
 dim(webs)
 
+countries.with.webs <-unique(webs$ISO3)
 
 ## ***********************************************
+#count up the webs in each Country
+## ***********************************************
+#count up the webs in each Country
+web_country <- webs %>%
+  group_by(ISO3)%>%
+  summarise(Total_webs_by_country = n())
+
+
+#this is so you can just subset the original dataframe later on
+webs <- left_join(web_country, webs, by = "ISO3")
+
+## ***********************************************
+#rename iso3c column of df to help with merging
+names(gdp)[names(gdp) == "Country.Code"] <- "ISO3"
+names(gdp)[names(gdp) == "Country.Name"] <- "Country"
+
+## need the gdp to convert proportion to $$
+# Select columns for the years 2000 to 2023 using the correct pattern
+year_columns <- grep("^X(200[0-9]|201[0-9]|2023)$", names(gdp))
+
+# Calculate the row medians for those columns
+gdp$GDP.MEDIAN <- apply(gdp[, year_columns], 1, median, na.rm = FALSE)
+
+## remove countries with NA 20 year gdp
+dim(gdp)
+gdp <- gdp[!is.na(gdp$GDP.MEDIAN),]
+dim(gdp)
+
+countries.no.webs <- gdp[!gdp$ISO3 %in% countries.with.webs, c("ISO3","Country")]
+
+
+## this is real data, there are no webs from these countries, so
+## create 0 count data and add them to the data
+## NA we count as true zeros. These are countries without GDP for usually
+## political reasons but are large areas with bees
+countries.no.webs$Total_webs_by_country <- 0
+
+# Add missing columns to no.webs (fill with NA or a default value)
+missing_cols <- setdiff(colnames(webs), colnames(countries.no.webs))
+
+# Add these columns to no.webs with NA (or set a default value if needed)
+for (col in missing_cols) {
+  countries.no.webs[[col]] <- NA
+}
+
+# Ensure the columns are in the same order
+countries.no.webs <- countries.no.webs[, colnames(webs)]
+
+# Now use rbind to combine the rows
+final <- rbind(webs, countries.no.webs)
+
+
+## ***********************************************
+
 #really cool way to handle colonies or sovereignt states!
 #I added a new column, one for the sovereignt (iso3c)or the colonial country
 #and one for the colony (admin or adm0_a3)
@@ -72,71 +121,28 @@ dim(webs)
 # Load countries with sovereignty info
 countries <- rnaturalearth::ne_countries(returnclass = "sf") %>%
   st_drop_geometry() %>%
-  dplyr::select(sovereignt, admin,  adm0_a3, continent)%>%
+  dplyr::select(sovereignt, admin,  adm0_a3, continent, type)%>%
   mutate(
     ISO3 = countrycode(sovereignt, origin = 'country.name', destination = 'iso3c'))
-  
-  
-names(webs)[names(webs) == "ISO3"] <- "adm0_a3"
+
+
+names(final)[names(final) == "ISO3"] <- "adm0_a3"
 names(countries)[names(countries) == "continent"] <- "Continent"
 
-final <- left_join(webs, countries, by = "adm0_a3")
 
-
-
-
-## ***********************************************
-#count up the webs in each Country
-web_country <- webs %>%
-  group_by(adm0_a3)%>%
-  summarise(Total_webs_by_country = n())
-
-## ## all should have a country code now
-(final$adm0_a3)[!(final$adm0_a3) %in% gdp$Country.Code]
-
-#this is so you can just subset the original dataframe later on
-final <- left_join(web_country, final, by = "adm0_a3")
+final <- left_join(final, countries, by = "adm0_a3")
 
 
 ## ***********************************************
-## join the web data with the gdp data
-## clean gdp data
-## **********************************************
 
+final <- left_join(final, gdp[, c("ISO3", "GDP.MEDIAN")], by = join_by(ISO3))
 
-# Summarize number of networks per country
-country_summary <- final %>%
-  distinct(adm0_a3, Total_webs_by_country) 
+hist(final$GDP.MEDIAN)
 
-# Merge your ISO3 summary data to the world map
-no.webs <- countries %>%
-  left_join(country_summary, by = "adm0_a3")%>%
-  dplyr::filter(is.na(Total_webs_by_country))
+#not offically recgonized ISO3
+no.ISO3 <- final[is.na(final$ISO3),]
 
-## this is real data, there are no webs from these countries, so
-## create 0 count data and add them to the data
-## NA we count as true zeros. These are countries without GDP for usually
-## political reasons but are large areas with bees
-no.webs$Total_webs_by_country <- 0
-
-# Add missing columns to no.webs (fill with NA or a default value)
-missing_cols <- setdiff(colnames(final), colnames(no.webs))
-
-# Add these columns to no.webs with NA (or set a default value if needed)
-for (col in missing_cols) {
-  no.webs[[col]] <- NA
-}
-
-# Ensure the columns are in the same order
-no.webs <- no.webs[, colnames(final)]
-
-# Now use rbind to combine the rows
-final <- rbind(final, no.webs)
-
-final <- final %>%
-  mutate(ISO3 = if_else(is.na(ISO3), adm0_a3, ISO3))
-
-
+write.csv(no.ISO3, file = "cleaning/potentially_drop_20yearGDP.csv")
 
 
 
@@ -171,50 +177,19 @@ final <- final %>%
 # Check if any missing hemispheres remain
 sum(is.na(final$Hemisphere))
 
-## ***********************************************
-
-#dim(gdp)
-#gdp <- gdp[!gdp$Country.Code %in% not.real.countries,]
-#dim(gdp)
-
-
-## need the gdp to convert proportion to $$
-# Select columns for the years 2000 to 2020 using the correct pattern
-year_columns <- grep("^X(200[0-9]|201[0-9]|2023)$", names(gdp))
-
-# Calculate the row medians for those columns
-gdp$GDP.MEDIAN <- apply(gdp[, year_columns], 1, median, na.rm = TRUE)
-
-
-## remove countries with NA gdp
-dim(gdp)
-gdp <- gdp[!is.na(gdp$GDP.MEDIAN),]
-dim(gdp)
-
-
-# View the result
-head(gdp)
-
-#rename iso3c column of df to help with merging
-names(gdp)[names(gdp) == "Country.Code"] <- "ISO3"
-
-final <- left_join(final, gdp[, c("ISO3", "GDP.MEDIAN")], by = join_by(ISO3))
-
-hist(final$GDP.MEDIAN)
-
-
 
 ## ***********************************************
 ## research investment by country
 ## ***********************************************
-#dim(res.inv)
-#res.inv <- res.inv[!res.inv$Country.Code %in% not.real.countries,]
-#dim(res.inv)
-
-## take the 20 year median
 year_columns <- grep("^X(200[0-9]|201[0-9]|2023)$", names(res.inv))
 
-res.inv$PropGDP_median <- apply(res.inv[, year_columns], 1, median, na.rm = TRUE)
+res.inv$PropGDP_median <- apply(res.inv[, year_columns], 1, function(x) {
+  if (sum(is.na(x)) <= 19) {
+    median(x, na.rm = TRUE)
+  } else {
+    NA
+  }
+})
 
 
 #rename iso3c column of df to help with merging
@@ -284,7 +259,7 @@ final$ResInvs_Density <- final$ResInvestTotal/ final$AREA_by_ISO3
 ## ***********************************************
 # drop the codes for regions, and country groupings
 ## also drop North Korea because they don't report well
-not.real.countries <- c("PRK", "")
+#not.real.countries <- c("PRK", "")
 #not.real.countries <- c("WLD", "AFE", "AFW", "ARB", "CEB", "CSS", "EAP",
 #                        "EAR", "EAS", "ECA", "ECS", "EMU", "EUU",
  #                       "FCS", "HIC", "HPC", "IBD", "IBT", "IDA",
@@ -299,13 +274,13 @@ not.real.countries <- c("PRK", "")
 
 
 #only korea is dropped
-dim(final)
-final <- final[!final$adm0_a3 %in% not.real.countries,]
-dim(final)
+#dim(final)
+#final <- final[!final$adm0_a3 %in% not.real.countries,]
+#dim(final)
 
 
 
-unique(final[is.na(final$Continent),]$adm0_a3)
+#unique(final[is.na(final$Continent),]$adm0_a3)
 
 
 
@@ -319,17 +294,17 @@ unique(final[is.na(final$Continent),]$adm0_a3)
 # geopolitical and geographic classifications, and are members of African regional
 # organizations such as the African Union.
 
-final <- final %>%
-  mutate(
-    Continent = case_when(
-      adm0_a3 == "DMA" ~ "North America",
-      adm0_a3 == "GRD" ~ "North America",
-      adm0_a3 == "MUS" ~ "Africa",
-      adm0_a3 == "SYC" ~ "Africa",
-      TRUE ~ Continent  # keep existing continent values
-    )
-  )
-unique(final[is.na(final$Continent),]$adm0_a3)
+#final <- final %>%
+#  mutate(
+#    Continent = case_when(
+#      adm0_a3 == "DMA" ~ "North America",
+#      adm0_a3 == "GRD" ~ "North America",
+#      adm0_a3 == "MUS" ~ "Africa",
+#      adm0_a3 == "SYC" ~ "Africa",
+#      TRUE ~ Continent  # keep existing continent values
+#    )
+#  )
+#unique(final[is.na(final$Continent),]$adm0_a3)
 
 
 ## ***********************************************
@@ -338,6 +313,13 @@ write.csv(final, file = "saved/webs_complete.csv")
 
 
 
+
+
+
+
+
+
+#reported gdp the whole 20 year... 
 
 
 
