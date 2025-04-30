@@ -29,7 +29,7 @@ library(scales)
 library(patchwork)
 #data
 webs <- read.csv("network-bias-saved/saved/webs_complete.csv")
-
+source("network-bias/2_models.R")
 savefilepath <- c("network-bias-saved/manuscript/figures")
 
 ## ***********************************************
@@ -43,32 +43,134 @@ savefilepath <- c("network-bias-saved/manuscript/figures")
 # variables. We included an interaction with each of these variables and continent 
 # to allow their slopes to vary by continent.  
 ## ***********************************************
-webs_complete <- webs[webs$Continent != "Oceania",]
-
-webs_complete$Continent <- factor(webs_complete$Continent,
-                                  levels=c("North America",
-                                           "South America",
-                                           "Africa",
-                                           "Europe",
-                                           "Asia"))
-
-
-webs_country <- webs_complete %>%
-  distinct(adm0_a3, .keep_all = TRUE) %>%
-  filter(!is.na(Continent) & 
-           !is.na(AREA) & 
-           !is.na(PropGDP_median) & 
-           !is.na(CL_Species))
-
-
-# Ensure the dataset contains the required transformed variables
-webs_country$log_AREA <- log(webs_country$AREA+1)
-webs_country$log_PropGDP_median <- log(webs_country$PropGDP_median+1)
-webs_country$log_CL_Species <- log(webs_country$CL_Species+1)
-webs_country$log_Total_webs_by_country <- log(webs_country$Total_webs_by_country+1)
-webs_country$log_ResInvs_Density <- log(webs_country$ResInvs_Density+1)
 
 ## ***********************************************
+
+
+
+# Load necessary packages
+library(dplyr)
+
+# Set color palette for continents
+continents <- unique(webs_country$Continent)
+continent_colors <- setNames(rainbow(length(continents)), continents)
+
+# Compute means of covariates
+log_ResInvs_mean <- mean(webs_country$log_ResInvs_Density, na.rm = TRUE)
+log_AREA_mean <- mean(webs_country$log_AREA, na.rm = TRUE)
+log_SR_mean <- mean(webs_country$log_CL_Species_density, na.rm = TRUE)
+plot_predictor_effect <- function(predictor_var, xlab, main_title, fixed_covariates) {
+  x_seq <- seq(min(webs_country[[predictor_var]], na.rm = TRUE),
+               max(webs_country[[predictor_var]], na.rm = TRUE),
+               length.out = 100)
+  
+  plot(webs_country[[predictor_var]], webs_country$Total_webs_by_country,
+       col = continent_colors[webs_country$Continent], pch = 16,
+       xlab = xlab,
+       ylab = "Number of Networks per Country",
+       main = main_title)
+  
+  legend("topleft", legend = names(continent_colors),
+         col = continent_colors, pch = 16, cex = 0.8)
+  
+  for (ct in continents) {
+    newdata <- data.frame(
+      Continent = rep(ct, length(x_seq)),
+      log_ResInvs_Density = if (predictor_var == "log_ResInvs_Density") x_seq else rep(fixed_covariates$log_ResInvs_Density, length(x_seq)),
+      log_AREA = if (predictor_var == "log_AREA") x_seq else rep(fixed_covariates$log_AREA, length(x_seq)),
+      log_CL_Species_density = if (predictor_var == "log_CL_Species_density") x_seq else rep(fixed_covariates$log_CL_Species_density, length(x_seq))
+    )
+    
+    pred <- predict(M1, newdata = newdata, type = "link", se.fit = TRUE)
+    
+    upr <- pred$fit + 1.96 * pred$se.fit
+    lwr <- pred$fit - 1.96 * pred$se.fit
+    
+    fit_resp <- exp(pred$fit)
+    upr_resp <- exp(upr)
+    lwr_resp <- exp(lwr)
+    
+    lines(x_seq, fit_resp, col = continent_colors[ct], lwd = 2)
+    
+    polygon(c(x_seq, rev(x_seq)),
+            c(lwr_resp, rev(upr_resp)),
+            col = adjustcolor(continent_colors[ct], alpha.f = 0.2),
+            border = NA)
+  }
+}
+
+# Define fixed covariate means
+fixed_covs <- list(
+  log_ResInvs_Density = log_ResInvs_mean,
+  log_AREA = log_AREA_mean,
+  log_CL_Species_density = log_SR_mean
+)
+
+# Run plots
+plot_predictor_effect("log_CL_Species_density",
+                      "Log Bee Species Richness Density",
+                      "Effect of Bee Species Richness on Network Count",
+                      fixed_covs)
+
+plot_predictor_effect("log_ResInvs_Density",
+                      "Log Research Investment Density",
+                      "Effect of Research Investment on Network Count",
+                      fixed_covs)
+
+plot_predictor_effect("log_AREA",
+                      "Log Area",
+                      "Effect of Area on Network Count",
+                      fixed_covs)
+
+
+
+## ***********************************************
+## ***********************************************
+## ***********************************************
+## ***********************************************
+
+
+
+
+
+# Use ggplot.Predict for plotting the fitted lines
+library(rms)
+
+# Set up the model frame
+dd <- datadist(webs_country)  # If you have a dataset used to fit the model
+options(datadist = "dd")
+
+
+theta_est <- M1$theta
+
+# Now fit the model using rms::Glm() with the estimated theta
+fit <- rms::Glm(Total_webs_by_country ~ Continent+
+                  log_ResInvs_Density +
+                  log_AREA +
+                  log_CL_Species_density, data = webs_country, family = negative.binomial(theta = theta_est))
+
+# Generate predictions
+pred <- Predict(fit, log_ResInvs_Density, Continent, fun = exp)
+
+ggplot(pred, aes(x = log_ResInvs_Density, y = yhat, color = Continent, fill = Continent)) +
+  geom_line(size = 1) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2, color = NA) +
+  labs(x = "log_ResInvs_Density", y = "Predicted Webs Count") +
+  coord_cartesian(ylim = c(0, 80)) +
+  theme_minimal()
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 area <- ggplot(webs_country,
                aes(x = log_AREA, y = log_Total_webs_by_country, color = Continent)) +

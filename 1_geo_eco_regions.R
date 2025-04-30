@@ -5,12 +5,11 @@ source("~/lab_paths.R")
 setwd(local.path)
 source("network-bias/src/initailize.R")
 
-library(rnaturalearth)
-library(dplyr)
-
 
 ## ***********************************************
-## General cleaning of web data
+## Summarizes reuse of repeatedly published networks
+## by determinging how many times the unique web code
+## occurs
 ## ***********************************************
 
 webs_reuse_count <- webs_reuse%>%
@@ -20,11 +19,12 @@ webs_reuse_count <- webs_reuse%>%
 #webs <- merge(webs_reuse_count, webs)
 webs <- left_join(webs, webs_reuse_count, by = "Web_Code")
 
-
+## ***********************************************
+## Cleaning the webs dataframe
 ## ***********************************************
 #columns to keep 
 col_keep <- c("Web_Code", "webs_reuse_count", "Publi_Year","LAT", "LONG", "Region",
-              "Continent", "ISO3", "Hemisphere", "Country")
+              "ISO3", "Hemisphere", "Country")
 
 # Keep only the specified columns
 webs <- webs[, col_keep, drop = FALSE]
@@ -72,29 +72,33 @@ web_country <- webs %>%
 webs <- left_join(web_country, webs, by = "ISO3")
 
 ## ***********************************************
+## Adding in Countries with Zero published networks
+## ***********************************************
+## this is real data, there are no webs from these countries, so
+## create 0 count data and add them to the data
+## NA we count as true zeros. We extract all entities from the GDP report
+## published by the world bank group that do not have published networks
+## in our data set.
+## https://databank.worldbank.org/reports.aspx?source=2&type=metadata&series=NY.GDP.MKTP.CD#
+
+
 #rename iso3c column of df to help with merging
 names(gdp)[names(gdp) == "Country.Code"] <- "ISO3"
 names(gdp)[names(gdp) == "Country.Name"] <- "Country"
 
-## need the gdp to convert proportion to $$
 # Select columns for the years 2000 to 2023 using the correct pattern
 year_columns <- grep("^X(200[0-9]|201[0-9]|2023)$", names(gdp))
 
 # Calculate the row medians for those columns
 gdp$GDP.MEDIAN <- apply(gdp[, year_columns], 1, median, na.rm = FALSE)
 
-## remove countries with NA 20 year gdp
+## remove countries with NA gdp median
 dim(gdp)
 gdp <- gdp[!is.na(gdp$GDP.MEDIAN),]
 dim(gdp)
 
 countries.no.webs <- gdp[!gdp$ISO3 %in% countries.with.webs, c("ISO3","Country")]
 
-
-## this is real data, there are no webs from these countries, so
-## create 0 count data and add them to the data
-## NA we count as true zeros. These are countries without GDP for usually
-## political reasons but are large areas with bees
 countries.no.webs$Total_webs_by_country <- 0
 
 # Add missing columns to no.webs (fill with NA or a default value)
@@ -110,10 +114,17 @@ countries.no.webs <- countries.no.webs[, colnames(webs)]
 
 # Now use rbind to combine the rows
 final <- rbind(webs, countries.no.webs)
-
-
 ## ***********************************************
-
+## Some reported countries in our dataset actually are
+## dependency on other countries (ex, greenland). Therefore
+## These countries will have a distinct adm0_a3 representing
+## themselves (ie greenland is GRL) while their ISO3 will be
+## the country for which they are dependent on (ie Denmark DNK).
+## This is because the research and gdp are only reported for the ISO3
+## and it includes the adm0_a3. It's impossible to disentangle. We
+## handle this later on by doing density (dividing by total land mass) 
+## of country and dependencies. 
+## ***********************************************
 #really cool way to handle colonies or sovereignt states!
 #I added a new column, one for the sovereignt (iso3c)or the colonial country
 #and one for the colony (admin or adm0_a3)
@@ -125,25 +136,103 @@ countries <- rnaturalearth::ne_countries(returnclass = "sf") %>%
   mutate(
     ISO3 = countrycode(sovereignt, origin = 'country.name', destination = 'iso3c'))
 
-
+#our current network data uses the adm0_a3 but its labeled ISO3
 names(final)[names(final) == "ISO3"] <- "adm0_a3"
+
+#don't have contintent in the data set
 names(countries)[names(countries) == "continent"] <- "Continent"
 
-
+#adding the ISO3 for each dependency 
 final <- left_join(final, countries, by = "adm0_a3")
 
+dependcies <-final[(final$adm0_a3 !=final$ISO3) &!is.na(final$ISO3) ,]
+head(dependcies)
+
+#checking for countries which have reported gdp but no data in the nartural
+#earth dataset. For now, we may assume that their ISO3 will match the adm0_a3,
+#but later on these a majority will get dropped since there's no reported 
+#research investment or species richness
+no_match <-final[is.na(final$ISO3),]
+head(no_match)
+
+# Step 1: Convert blank or NA ISO3 using the Country column
+final$ISO3[is.na(final$ISO3) | final$ISO3 == ""] <- countrycode(
+  final$Country[is.na(final$ISO3) | final$ISO3 == ""],
+  origin = 'country.name',
+  destination = 'iso3c'
+)
+
+no_match <-final[is.na(final$ISO3),]
+head(no_match)
+
+# Step 2: Fill in remaining NAs with adm0_a3
+final$ISO3[is.na(final$ISO3) | final$ISO3 == ""] <- final$adm0_a3[is.na(final$ISO3) | final$ISO3 == ""]
 
 ## ***********************************************
+## Now that we have our complete dataset clean
+## and containing zeros, we can add in the country 
+## level variable: gdp median, research investment 
+## (per GDP and total), bee species richness, and
+## area of country
+## ***********************************************
 
+#adding GDP median
 final <- left_join(final, gdp[, c("ISO3", "GDP.MEDIAN")], by = join_by(ISO3))
 
 hist(final$GDP.MEDIAN)
 
-#not offically recgonized ISO3
-no.ISO3 <- final[is.na(final$ISO3),]
+#Research and development expenditure (% of GDP), 
+#https://databank.worldbank.org/reports.aspx?source=2&type=metadata&series=GB.XPD.RSDV.GD.ZS#
+#reported by the worldbank
 
-write.csv(no.ISO3, file = "cleaning/potentially_drop_20yearGDP.csv")
+#grab columns from 2000 to 2023
+year_columns <- grep("^X(200[0-9]|201[0-9]|2023)$", names(res.inv))
 
+#only take the median of the countries research investment if they reported at
+#least 5 years of data between 2000 and 2023
+res.inv$PropGDP_median <- apply(res.inv[, year_columns], 1, function(x) {
+  if (sum(is.na(x)) <= 19) {
+    median(x, na.rm = TRUE)
+  } else {
+    NA
+  }
+})
+
+
+#rename iso3c column of res.inv to help with merging
+names(res.inv)[names(res.inv) == "Country.Code"] <- "ISO3"
+
+#merge gdp_median with complete df
+final <- left_join(final, res.inv[,c("ISO3", "PropGDP_median")], by="ISO3")
+
+
+## convert proportion to $$ by multiplying gdp and prop
+final$ResInvestTotal <- final$PropGDP_median*final$GDP.MEDIAN
+
+
+hist(log(final$ResInvestTotal),
+     main="Research invenstment 20 year median", xlab="Investment in US dollars (log)",
+     ylab="Number of countries")
+
+
+# We used the Orr et al. 2021 dataset to assign countries area (km2) and bee 
+# species richness
+
+#subset and standardize df
+area.richness <- area.richness[, c("NAME", "ISO3", "AREA", "CL_Species")]
+area.richness$AREA <- as.numeric(area.richness$AREA)
+
+#since this is by country not dependency
+names(area.richness)[names(area.richness) == "ISO3"] <- "adm0_a3"
+
+## merging networks and bee richness by country
+final <- left_join(final, area.richness, by = "adm0_a3")
+
+#In our analysis of country level affects on network occurence, we will need to
+#drop countries with no reported research investment (gdp or exependiture driven)
+#bee species, and area
+drop_countries <- final[is.na(final$ResInvestTotal)|is.na(final$CL_Species)|is.na(final$AREA),]
+write.csv(drop_countries, file = "cleaning/offically_dropped/drop_countries.csv")
 
 
 ## ***********************************************
@@ -169,7 +258,6 @@ latitudes<- latitudes %>%
 # Merge with your dataset
 final <- left_join(final, latitudes, by = "adm0_a3")
 
-## ***********************************************
 # Assign hemisphere
 final <- final %>%
   mutate(Hemisphere = ifelse(is.na(Hemisphere), ifelse(LAT_country >= 0, "Northern", "Southern"), Hemisphere))
@@ -179,69 +267,16 @@ sum(is.na(final$Hemisphere))
 
 
 ## ***********************************************
-## research investment by country
+## Adding in metrics for ease of modeling and plotting
 ## ***********************************************
-year_columns <- grep("^X(200[0-9]|201[0-9]|2023)$", names(res.inv))
-
-res.inv$PropGDP_median <- apply(res.inv[, year_columns], 1, function(x) {
-  if (sum(is.na(x)) <= 19) {
-    median(x, na.rm = TRUE)
-  } else {
-    NA
-  }
-})
-
-
-#rename iso3c column of df to help with merging
-names(res.inv)[names(res.inv) == "Country.Code"] <- "ISO3"
-
-#merge gdp_median with complete df
-final <- left_join(final, res.inv[,c("ISO3", "PropGDP_median")], by="ISO3")
-
-## convert proportion to $$ by multiplying gdp and prop
-final$ResInvestTotal <- final$PropGDP_median*final$GDP.MEDIAN
-
-
-hist(log(final$ResInvestTotal),
-     main="Research invenstment 20 year median", xlab="Investment in US dollars (log)",
-     ylab="Number of countries")
-
-
-## ***********************************************
-## Area and bees' diversity by country
-## ***********************************************
-## VAT= vatican, FM= micronesia
-area.richness <- area.richness[, c("NAME", "ISO3", "AREA", "CL_Species")]
-
-#dim(area.richness)
-#area.richness <- area.richness[!area.richness$ISO3 %in% not.real.countries,]
-#dim(area.richness)
-
-## drop really small islands that are territories and would have been
-## coded as part of the colonial empire
-area.richness$AREA <- as.numeric(area.richness$AREA)
-
-#since this is by country not colonial power
-names(area.richness)[names(area.richness) == "ISO3"] <- "adm0_a3"
-
-
-## merging networks and bee richness by country
-final <- left_join(final, area.richness, by = "adm0_a3")
-
-## ***********************************************
-## Years since published
-## ***********************************************
+#years since publication of network
 final <- final %>%
   mutate(years_since_pub = as.numeric(format(Sys.Date(), "%Y")) - Publi_Year)
 
-
-## ***********************************************
-## Density
-## ***********************************************
-#country level
+#density of bee species by country
 final$CL_Species_Density <- final$CL_Species/ final$AREA
 
-#sovergein level
+#sum area of dependencies and country
 densities <- final %>%
    distinct(adm0_a3, .keep_all = TRUE) %>%
    group_by(ISO3) %>%
@@ -249,62 +284,8 @@ densities <- final %>%
 
 final <- left_join(final, densities, by = "ISO3")
 
-
+#take the density for each
 final$ResInvs_Density <- final$ResInvestTotal/ final$AREA_by_ISO3
-
-  
-
-
-
-## ***********************************************
-# drop the codes for regions, and country groupings
-## also drop North Korea because they don't report well
-#not.real.countries <- c("PRK", "")
-#not.real.countries <- c("WLD", "AFE", "AFW", "ARB", "CEB", "CSS", "EAP",
-#                        "EAR", "EAS", "ECA", "ECS", "EMU", "EUU",
- #                       "FCS", "HIC", "HPC", "IBD", "IBT", "IDA",
-#                        "IDB",
-#                        "IDX", "INX", "LAC", "LCN", "LDC", "LIC",
-#                        "LMC", "LMY", "LTE", "MEA", "MIC", "MNA",
-#                        "NAC", "OED", "OSS", "PRE", "PSE", "PSS",
-#                        "PST",
-#                        "SAS", "SSA", "SSF", "SST", "TEA", "TEC",
-#                        "TLA", "TMM", "TSA", "TSS", "UMC", "PRK",
-#                        "", "VAT")
-
-
-#only korea is dropped
-#dim(final)
-#final <- final[!final$adm0_a3 %in% not.real.countries,]
-#dim(final)
-
-
-
-#unique(final[is.na(final$Continent),]$adm0_a3)
-
-
-
-# Dominica (DMA) and Grenada (GRD) are island nations located in the Caribbean. 
-# Although they're islands, the Caribbean is typically considered part of the 
-# Americas, and in most global datasets—such as those from the United Nations or
-# the World Bank—Caribbean countries are grouped under North America for 
-# continental classification. On the other hand, Mauritius (MUS) and Seychelles
-# (SYC) are island nations situated in the Indian Ocean, off the eastern coast of
-# Africa. Despite their insular geography, they are considered part of Africa in 
-# geopolitical and geographic classifications, and are members of African regional
-# organizations such as the African Union.
-
-#final <- final %>%
-#  mutate(
-#    Continent = case_when(
-#      adm0_a3 == "DMA" ~ "North America",
-#      adm0_a3 == "GRD" ~ "North America",
-#      adm0_a3 == "MUS" ~ "Africa",
-#      adm0_a3 == "SYC" ~ "Africa",
-#      TRUE ~ Continent  # keep existing continent values
-#    )
-#  )
-#unique(final[is.na(final$Continent),]$adm0_a3)
 
 
 ## ***********************************************
@@ -313,13 +294,6 @@ write.csv(final, file = "saved/webs_complete.csv")
 
 
 
-
-
-
-
-
-
-#reported gdp the whole 20 year... 
 
 
 

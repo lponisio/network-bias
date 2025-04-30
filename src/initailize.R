@@ -4,6 +4,7 @@ library(tidyverse)
 library(sf)
 library(dplyr)
 library(countrycode)
+library(rnaturalearth)
 
 source("~/lab_paths.R")
 setwd(local.path)
@@ -14,12 +15,12 @@ webs <- read.csv("raw/webs.csv", sep = ";")
 webs_reuse <- read.csv("raw/network_reuse.csv", sep = ";")
 res.inv <- read.csv("raw/research_expenditure.csv")
 gdp <- read.csv("raw/gdp.csv")
-biome.code <- read.csv("raw/biome_codes.csv")
 area.richness <- read.csv("raw/bees_by_country.csv")
 
 
 ## load biome data
-biomes <- st_read(dsn="official", layer="wwf_terr_ecos")
+#biomes <- st_read(dsn="official", layer="wwf_terr_ecos")
+#biome.code <- read.csv("raw/biome_codes.csv")
 
 
 

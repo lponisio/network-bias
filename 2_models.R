@@ -19,33 +19,31 @@ source("network-bias/src/initalize_models.R")
 # to allow their slopes to vary by continent.  
 ## ***********************************************
 
-webs_complete <- webs_complete[!webs_complete$Continent.y 
-                               %in% c("Seven seas (open ocean)"), ]
+webs_complete <- webs_complete[!webs_complete$Continent 
+                               %in% c("Seven seas (open ocean)","Oceania"), ]
 
-webs_complete$Continent.y <- factor(webs_complete$Continent.y,
+webs_complete$Continent <- factor(webs_complete$Continent,
                                  levels=c("North America",
                                           "South America",
                                           "Africa",
                                           "Europe",
-                                          "Asia", 
-                                          "Oceania"))
+                                          "Asia"))
 
 webs_country <- webs_complete %>%
   distinct(adm0_a3, .keep_all = TRUE) %>%
-  filter(!is.na(Continent.y),
+  filter(!is.na(Continent),
            !is.na(AREA) , 
            !is.na(ResInvs_Density) ,
            !is.na(CL_Species_Density))
 
 
 not_in_analysis <- setdiff(unique(webs_complete$adm0_a3), unique(webs_country$adm0_a3))
-not_in_analysis<-webs_complete[webs_complete$adm0_a3 %in%not_in_analysis,]
-not_in_analysis <- not_in_analysis %>%
-  distinct(adm0_a3, .keep_all = TRUE)
 
-write.csv(not_in_analysis, file = "not_in_analysis.csv")
+not_in_analysis <- webs_complete %>%
+  distinct(adm0_a3, .keep_all = TRUE) %>%
+  filter(adm0_a3 %in%not_in_analysis)
 
-#countrycode(not_in_analysis, origin = "iso3c", destination = "country.name")
+write.csv(not_in_analysis, file = "network-bias-saved/cleaning/offically_dropped/not_in_analysis.csv")
 
 
 # Ensure the dataset contains the required transformed variables
@@ -60,8 +58,8 @@ hist(webs_country$log_ResInvs_Density)
 hist(webs_country$log_CL_Species_density)
 
 
-M1 <- glm.nb(Total_webs_by_country ~ Continent.y+
-                ResInvs_Density +
+M1 <- glm.nb(Total_webs_by_country ~ Continent+
+               log_ResInvs_Density +
                 log_AREA +
                 log_CL_Species_density,
                 data = webs_country)
@@ -69,55 +67,36 @@ M1 <- glm.nb(Total_webs_by_country ~ Continent.y+
 summary(M1)
 check_model(M1)
 
+library(pscl)
 
-
-
-
-library(glmmTMB)
-
-M2 <- glmmTMB(Total_webs_by_country ~ Continent +
-                log_ResInvs_Density +
-                log_AREA +
-                log_CL_Species_density,
-              #ziformula = ~Continent,
-              dispformula = ~log_AREA,
-              family = nbinom2,
-              data = webs_country)
-summary(M2)
-check_model(M2)
-
-
-M_hurdle <- glmmTMB(
-  Total_webs_by_country ~ Continent +
-    log_ResInvs_Density +
-    log_AREA +
-    log_CL_Species_density,
-  ziformula = Continent +
-    log_ResInvs_Density +
-    log_AREA +
-    log_CL_Species_density,  # No zero-inflation; this is a hurdle model
-  #dispformula = ~log_AREA, # Constant dispersion
-  family = truncated_nbinom2(),  # Hurdle NB (zeros modeled separately)
-  data = webs_country
+# Fit a hurdle model (zero part: binomial, count part: negative binomial)
+M_hurdle <- hurdle(
+  Total_webs_by_country ~ Continent + log_ResInvs_Density + log_AREA + log_CL_Species_density,
+  data = webs_country,
+  dist = "negbin", 
+  zero.dist = "binomial"
 )
 
 summary(M_hurdle)
-check_model(M_hurdle)
 
+# Number of observed zeros
+obs_zeros <- sum(webs_country$Total_webs_by_country == 0)
+
+# Predicted probabilities of zero
+pred_probs <- predict(M_hurdle, type = "response")
+pred_counts <- rnbinom(n = length(pred_probs), mu = pred_probs, size = M_hurdle$theta)
+pred_zeros <- sum(pred_counts == 0)
+
+cat("Observed zeros:", obs_zeros, "\nPredicted zeros:", pred_zeros, "\n")
 
 library(pscl)
-
-mod.hurdle.nb <- pscl::hurdle(Total_webs_by_country ~ Continent +
-                            log_ResInvs_Density +
-                            log_AREA +
-                            log_CL_Species_density, 
-                          data = webs_country, dist = "negbin", 
-                          zero.dist = "binomial")
-
-summary(mod.hurdle.nb)
-check_model(mod.hurdle.nb)
-
-hist(webs_country[webs_country$Total_webs_by_country>0,]$Total_webs_by_country)
+vuong(M1, M_hurdle)
+#Conflicting evidence depending on correction method:
+#  Raw: significant advantage for the hurdle model.#
+#AIC: no clear winner.
+#BIC: favors the simpler GLM.
+#This suggests your hurdle model captures the zero-inflation better (raw), but the GLM may generalize better with fewer parameters (BIC).
+#stick with glm then for interpretability and generalizability
 
 # 
 # boot_fun <- function(model, data) {
@@ -150,11 +129,6 @@ hist(webs_country[webs_country$Total_webs_by_country>0,]$Total_webs_by_country)
 # boot_ci
 
 
-
-
-
-
-
 ## ***********************************************
 ## network re-use
 ## ***********************************************
@@ -173,7 +147,6 @@ webs_reuse <- webs_complete %>%
 webs_reuse$webs_reuse_count
 
 webs_reuse$log_years_since_pub <- datawizard::standardize(log(webs_reuse$years_since_pub))
-
 
 
 library(MASS)
