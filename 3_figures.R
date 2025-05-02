@@ -59,16 +59,36 @@ continent_colors <- setNames(rainbow(length(continents)), continents)
 log_ResInvs_mean <- mean(webs_country$log_ResInvs_Density, na.rm = TRUE)
 log_AREA_mean <- mean(webs_country$log_AREA, na.rm = TRUE)
 log_SR_mean <- mean(webs_country$log_CL_Species_density, na.rm = TRUE)
+
+
 plot_predictor_effect <- function(predictor_var, xlab, main_title, fixed_covariates) {
+  # Get z-score range from data
   x_seq <- seq(min(webs_country[[predictor_var]], na.rm = TRUE),
                max(webs_country[[predictor_var]], na.rm = TRUE),
                length.out = 100)
   
+  # Get mean and sd of the original log-transformed variable
+  original_var <- switch(predictor_var,
+                         "log_CL_Species_density" = log(webs_country$CL_Species_Density),
+                         "log_ResInvs_Density" = log(webs_country$Research_Investment_Density),
+                         "log_AREA" = log(webs_country$Country_Area_km2))
+  
+  original_mean <- mean(original_var, na.rm = TRUE)
+  original_sd <- sd(original_var, na.rm = TRUE)
+  
+  # For plotting: x values are standardized, but we want axis labels in original units
   plot(webs_country[[predictor_var]], webs_country$Total_webs_by_country,
        col = continent_colors[webs_country$Continent], pch = 16,
-       xlab = xlab,
+       xaxt = "n",  # suppress default x-axis
+       xlab = gsub("Log ", "", xlab),
        ylab = "Number of Networks per Country",
        main = main_title)
+  
+  # Custom x-axis: convert z-scores to real-world (unlogged) scale
+  z_ticks <- pretty(range(webs_country[[predictor_var]], na.rm = TRUE), n = 5)
+  raw_labels <- exp(z_ticks * original_sd + original_mean)
+  
+  axis(side = 1, at = z_ticks, labels = round(raw_labels, 1))  # real units
   
   legend("topleft", legend = names(continent_colors),
          col = continent_colors, pch = 16, cex = 0.8)
@@ -98,6 +118,8 @@ plot_predictor_effect <- function(predictor_var, xlab, main_title, fixed_covaria
             border = NA)
   }
 }
+
+
 
 # Define fixed covariate means
 fixed_covs <- list(
