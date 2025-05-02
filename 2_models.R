@@ -20,14 +20,15 @@ source("network-bias/src/initalize_models.R")
 ## ***********************************************
 
 webs_complete <- webs_complete[!webs_complete$Continent 
-                               %in% c("Seven seas (open ocean)","Oceania"), ]
+                               %in% c("Seven seas (open ocean)"), ]
 
 webs_complete$Continent <- factor(webs_complete$Continent,
                                  levels=c("North America",
                                           "South America",
                                           "Africa",
                                           "Europe",
-                                          "Asia"))
+                                          "Asia",
+                                          "Oceania"))
 
 webs_country <- webs_complete %>%
   distinct(adm0_a3, .keep_all = TRUE) %>%

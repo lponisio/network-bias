@@ -5,32 +5,7 @@ source("~/lab_paths.R")
 local.path
 setwd(local.path)
 
-#packages
-library(performance)
-library(lme4)
-library(dplyr)
-library(MASS)
-library(cowplot)
-library(ggplot2)
-## library(ggeffects)
-library(viridis)
-library(ggplot2)
-library(tidyverse)
-library(maps)
-library(grid) # For unit()
-
-# Load required libraries
-library(rnaturalearth)  # for world map data
-library(sf)             # for spatial data manipulation
-library(cartogram)      # for generating cartograms
-library(dplyr)
-library(ggplot2)
-library(scales)
-library(patchwork)
-#data
-webs <- read.csv("network-bias-saved/saved/webs_complete.csv")
-source("network-bias/2_models.R")
-savefilepath <- c("network-bias-saved/manuscript/figures")
+source("network-bias/src/initalize_figure.R")
 
 ## ***********************************************
 ## country-level variables
@@ -46,198 +21,204 @@ savefilepath <- c("network-bias-saved/manuscript/figures")
 
 ## ***********************************************
 
-
-
-# Load necessary packages
-library(dplyr)
-
-# Set color palette for continents
+# Define color palette for continents
 continents <- unique(webs_country$Continent)
-continent_colors <- setNames(rainbow(length(continents)), continents)
+#continent_colors <- setNames(rainbow(length(continents)), continents)
 
-# Compute means of covariates
-log_ResInvs_mean <- mean(webs_country$log_ResInvs_Density, na.rm = TRUE)
+# Calculate means for covariates
 log_AREA_mean <- mean(webs_country$log_AREA, na.rm = TRUE)
 log_SR_mean <- mean(webs_country$log_CL_Species_density, na.rm = TRUE)
+log_RD_mean <- mean(webs_country$log_ResInvs_Density, na.rm = TRUE)
 
+## ***********************************************
 
-plot_predictor_effect <- function(predictor_var, xlab, main_title, fixed_covariates) {
-  # Get z-score range from data
-  x_seq <- seq(min(webs_country[[predictor_var]], na.rm = TRUE),
-               max(webs_country[[predictor_var]], na.rm = TRUE),
+# Generate prediction data for each continent
+prediction_data <- do.call(rbind, lapply(continents, function(ct) {
+  x_seq <- seq(min(webs_country$log_ResInvs_Density, na.rm = TRUE),
+               max(webs_country$log_ResInvs_Density, na.rm = TRUE),
                length.out = 100)
-  
-  # Get mean and sd of the original log-transformed variable
-  original_var <- switch(predictor_var,
-                         "log_CL_Species_density" = log(webs_country$CL_Species_Density),
-                         "log_ResInvs_Density" = log(webs_country$Research_Investment_Density),
-                         "log_AREA" = log(webs_country$Country_Area_km2))
-  
-  original_mean <- mean(original_var, na.rm = TRUE)
-  original_sd <- sd(original_var, na.rm = TRUE)
-  
-  # For plotting: x values are standardized, but we want axis labels in original units
-  plot(webs_country[[predictor_var]], webs_country$Total_webs_by_country,
-       col = continent_colors[webs_country$Continent], pch = 16,
-       xaxt = "n",  # suppress default x-axis
-       xlab = gsub("Log ", "", xlab),
-       ylab = "Number of Networks per Country",
-       main = main_title)
-  
-  # Custom x-axis: convert z-scores to real-world (unlogged) scale
-  z_ticks <- pretty(range(webs_country[[predictor_var]], na.rm = TRUE), n = 5)
-  raw_labels <- exp(z_ticks * original_sd + original_mean)
-  
-  axis(side = 1, at = z_ticks, labels = round(raw_labels, 1))  # real units
-  
-  legend("topleft", legend = names(continent_colors),
-         col = continent_colors, pch = 16, cex = 0.8)
-  
-  for (ct in continents) {
-    newdata <- data.frame(
-      Continent = rep(ct, length(x_seq)),
-      log_ResInvs_Density = if (predictor_var == "log_ResInvs_Density") x_seq else rep(fixed_covariates$log_ResInvs_Density, length(x_seq)),
-      log_AREA = if (predictor_var == "log_AREA") x_seq else rep(fixed_covariates$log_AREA, length(x_seq)),
-      log_CL_Species_density = if (predictor_var == "log_CL_Species_density") x_seq else rep(fixed_covariates$log_CL_Species_density, length(x_seq))
-    )
-    
-    pred <- predict(M1, newdata = newdata, type = "link", se.fit = TRUE)
-    
-    upr <- pred$fit + 1.96 * pred$se.fit
-    lwr <- pred$fit - 1.96 * pred$se.fit
-    
-    fit_resp <- exp(pred$fit)
-    upr_resp <- exp(upr)
-    lwr_resp <- exp(lwr)
-    
-    lines(x_seq, fit_resp, col = continent_colors[ct], lwd = 2)
-    
-    polygon(c(x_seq, rev(x_seq)),
-            c(lwr_resp, rev(upr_resp)),
-            col = adjustcolor(continent_colors[ct], alpha.f = 0.2),
-            border = NA)
-  }
+  newdata <- data.frame(
+    Continent = ct,
+    log_ResInvs_Density = x_seq,
+    log_AREA = log_AREA_mean,
+    log_CL_Species_density = log_SR_mean
+  )
+  pred <- predict(M1, newdata = newdata, type = "link", se.fit = TRUE)
+  newdata$fit <- exp(pred$fit)
+  newdata$lwr <- exp(pred$fit - 1.96 * pred$se.fit)
+  newdata$upr <- exp(pred$fit + 1.96 * pred$se.fit)
+  return(newdata)
+}))
+
+
+log_resinv_raw <- log(webs_country$ResInvs_Density)
+log_resinv_mean <- mean(log_resinv_raw, na.rm = TRUE)
+log_resinv_sd <- sd(log_resinv_raw, na.rm = TRUE)
+
+inv_standardize <- function(x, mean, sd) {
+  raw_log <- x * sd + mean
+  raw_val <- exp(raw_log)
+  round(raw_val, -2)
 }
 
+## ***********************************************
 
+ResInvs <- ggplot(webs_country,
+               aes(x = log_ResInvs_Density, y = Total_webs_by_country, color = Continent)) +
+  geom_point(show.legend = FALSE, size = 3) +
+  geom_line(data = prediction_data, show.legend = FALSE,
+            aes(x = log_ResInvs_Density, y = fit, color = Continent), 
+            size = 1) +
+  geom_ribbon(data = prediction_data, show.legend = FALSE,
+              aes(x = log_ResInvs_Density, ymin = lwr, ymax = upr, fill = Continent), 
+              alpha = 0.1, inherit.aes = FALSE) +
+  scale_color_viridis_d() +
+  scale_fill_viridis_d() +
+  scale_x_continuous(
+    labels = function(x) inv_standardize(x, mean = log_resinv_mean, sd = log_resinv_sd)
+  )+
+  coord_cartesian(ylim = c(0, 175)) +
+  labs(x = expression("Research Investment per km"^2), 
+       y = "Number of Networks",
+       title = "Effect of Research Investment on Network Count") +
+  theme_classic(base_size = 15) 
 
-# Define fixed covariate means
-fixed_covs <- list(
-  log_ResInvs_Density = log_ResInvs_mean,
-  log_AREA = log_AREA_mean,
-  log_CL_Species_density = log_SR_mean
-)
+ResInvs
+## ***********************************************
 
-# Run plots
-plot_predictor_effect("log_CL_Species_density",
-                      "Log Bee Species Richness Density",
-                      "Effect of Bee Species Richness on Network Count",
-                      fixed_covs)
+# Step 1: Get mean and SD of the unstandardized log species richness density
+log_sr_raw <- webs_country$log_CL_Species_density
+log_sr_mean <- mean(log_sr_raw, na.rm = TRUE)
+log_sr_sd <- sd(log_sr_raw, na.rm = TRUE)
 
-plot_predictor_effect("log_ResInvs_Density",
-                      "Log Research Investment Density",
-                      "Effect of Research Investment on Network Count",
-                      fixed_covs)
+# Step 3: Generate prediction data for each continent
+continents <- unique(webs_country$Continent)
+x_seq_sr <- seq(min(webs_country$log_CL_Species_density, na.rm = TRUE),
+                max(webs_country$log_CL_Species_density, na.rm = TRUE),
+                length.out = 100)
 
-plot_predictor_effect("log_AREA",
-                      "Log Area",
-                      "Effect of Area on Network Count",
-                      fixed_covs)
+log_resinv_mean <- mean(webs_country$log_AREA, na.rm = TRUE)
+log_area_mean <- mean(webs_country$log_AREA, na.rm = TRUE)
 
+prediction_data_sr <- do.call(rbind, lapply(continents, function(ct) {
+  newdata <- data.frame(
+    Continent = ct,
+    log_ResInvs_Density = mean(webs_country$log_ResInvs_Density, na.rm = TRUE),  # hold constant
+    log_CL_Species_density = x_seq_sr,
+    log_AREA = log_area_mean
+  )
+  pred <- predict(M1, newdata = newdata, type = "link", se.fit = TRUE)
+  
+  fit_resp <- exp(pred$fit)
+  upr_resp <- exp(pred$fit + 1.96 * pred$se.fit)
+  lwr_resp <- exp(pred$fit - 1.96 * pred$se.fit)
+  
+  cbind(newdata, fit = fit_resp, upr = upr_resp, lwr = lwr_resp)
+}))
+
+# Step 4: Plot
+sr_plot <- ggplot(webs_country,
+                  aes(x = log_CL_Species_density, y = Total_webs_by_country, color = Continent)) +
+  geom_point(show.legend = FALSE, size = 3) +
+  geom_line(data = prediction_data_sr, 
+            aes(x = log_CL_Species_density, y = fit, color = Continent), 
+            size = 1) +
+  geom_ribbon(data = prediction_data_sr, 
+              aes(x = log_CL_Species_density, ymin = lwr, ymax = upr, fill = Continent), 
+              alpha = 0.1, inherit.aes = FALSE) +
+  scale_color_viridis_d() +
+  scale_fill_viridis_d() +
+  scale_x_continuous(
+    labels = function(x) inv_standardize(x, mean = log_sr_mean, sd = log_sr_sd)
+  ) +
+  coord_cartesian(ylim = c(0, 175)) +
+  labs(x = "Species Richness per km²", 
+       y = "Number of Networks",
+       title = "Effect of Species Richness on Network Count") +
+  theme_classic() +
+  theme(
+    axis.text = element_text(size = 14),
+    axis.title = element_text(size = 16),
+    plot.title = element_text(size = 18)
+  ) 
+# Display plot
+sr_plot
 
 
 ## ***********************************************
-## ***********************************************
-## ***********************************************
-## ***********************************************
+
+# Step 1: Get mean and SD of unstandardized log(AREA)
+log_area_raw <- log(webs_country$AREA)
+log_area_mean <- mean(log_area_raw, na.rm = TRUE)
+log_area_sd <- sd(log_area_raw, na.rm = TRUE)
+
+# Step 2: Define inverse standardization function
+inv_standardize <- function(x, mean, sd) {
+  raw_log <- x * sd + mean
+  raw_val <- exp(raw_log)
+  round(raw_val, -2)
+}
+
+# Step 3: Generate prediction data for each continent
+continents <- unique(webs_country$Continent)
+x_seq_area <- seq(min(webs_country$log_AREA, na.rm = TRUE),
+                  max(webs_country$log_AREA, na.rm = TRUE),
+                  length.out = 100)
+
+log_resinv_mean <- mean(webs_country$log_ResInvs_Density, na.rm = TRUE)
+log_sr_mean <- mean(webs_country$log_CL_Species_density, na.rm = TRUE)
+
+prediction_data_area <- do.call(rbind, lapply(continents, function(ct) {
+  newdata <- data.frame(
+    Continent = ct,
+    log_ResInvs_Density = log_resinv_mean,
+    log_CL_Species_density = log_sr_mean,
+    log_AREA = x_seq_area
+  )
+  pred <- predict(M1, newdata = newdata, type = "link", se.fit = TRUE)
+  
+  fit_resp <- exp(pred$fit)
+  upr_resp <- exp(pred$fit + 1.96 * pred$se.fit)
+  lwr_resp <- exp(pred$fit - 1.96 * pred$se.fit)
+  
+  cbind(newdata, fit = fit_resp, upr = upr_resp, lwr = lwr_resp)
+}))
+
+# Step 4: Plot
+area_plot <- ggplot(webs_country,
+                    aes(x = log_AREA, y = Total_webs_by_country, color = Continent)) +
+  geom_point(show.legend = FALSE, size = 3) +
+  geom_line(data = prediction_data_area, 
+            aes(x = log_AREA, y = fit, color = Continent), 
+            size = 1) +
+  geom_ribbon(data = prediction_data_area, 
+              aes(x = log_AREA, ymin = lwr, ymax = upr, fill = Continent), 
+              alpha = 0.1, inherit.aes = FALSE) +
+  scale_color_viridis_d() +
+  scale_fill_viridis_d() +
+  scale_x_continuous(
+    labels = function(x) inv_standardize(x, mean = log_area_mean, sd = log_area_sd)
+  ) +
+  coord_cartesian(ylim = c(0, 175)) +
+  labs(x = expression("Area (km"^2*")"), 
+       y = "Number of Networks",
+       title = "Effect of Country Area on Network Count") +
+  theme_classic() +
+  theme(
+    axis.text = element_text(size = 14),
+    axis.title = element_text(size = 16),
+    plot.title = element_text(size = 18)
+  )
+
+# Display plot
+area_plot
 
 
 
-
-
-# Use ggplot.Predict for plotting the fitted lines
-library(rms)
-
-# Set up the model frame
-dd <- datadist(webs_country)  # If you have a dataset used to fit the model
-options(datadist = "dd")
-
-
-theta_est <- M1$theta
-
-# Now fit the model using rms::Glm() with the estimated theta
-fit <- rms::Glm(Total_webs_by_country ~ Continent+
-                  log_ResInvs_Density +
-                  log_AREA +
-                  log_CL_Species_density, data = webs_country, family = negative.binomial(theta = theta_est))
-
-# Generate predictions
-pred <- Predict(fit, log_ResInvs_Density, Continent, fun = exp)
-
-ggplot(pred, aes(x = log_ResInvs_Density, y = yhat, color = Continent, fill = Continent)) +
-  geom_line(size = 1) +
-  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2, color = NA) +
-  labs(x = "log_ResInvs_Density", y = "Predicted Webs Count") +
-  coord_cartesian(ylim = c(0, 80)) +
-  theme_minimal()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-area <- ggplot(webs_country,
-               aes(x = log_AREA, y = log_Total_webs_by_country, color = Continent)) +
-  geom_point(show.legend = FALSE) +  # Remove legend from points
-  scale_color_viridis(discrete = TRUE) +
-  geom_smooth(method = "glm",
-              method.args = list(family = "quasipoisson"), # Closest match to neg. binomial in ggplot
-              formula = y ~ scale(x), alpha = 0.15,
-              se = TRUE, show.legend = FALSE) +
-  scale_x_continuous(labels = function(x) round(exp(x) -1, -2)) + # Convert log-scale to original
-  scale_y_continuous(labels = function(x) round(exp(x)-1)) + # Convert log-scale to original
-  labs(x = expression("Area (km"^2*")"), y = "Networks") +
-  theme_classic()
-
-#research invs by networks
-res_inv <- ggplot(webs_country,
-                  aes(x = log_ResInvs_Density, y = log_Total_webs_by_country, color = Continent)) +
-  geom_point() +
-  scale_color_viridis(discrete = T) +
-  geom_smooth(method = "glm",
-              method.args = list(family = "quasipoisson"), # Closest match to neg. binomial in ggplot
-              formula = y ~ scale(x), alpha = 0.15,
-              se = TRUE) +
-  scale_x_continuous(labels = function(x) round(exp(x)-1, 2)) +
-  scale_y_continuous(labels = function(x) round(exp(x)-1)) + # Convert log-scale to original
-  labs(x = expression("Research investment density (USD/"* km^2 *")"), y = "") +
-  theme_classic()
-
-#Bee species
-bees <- ggplot(webs_country,
-               aes(x = log_CL_Species, y = log_Total_webs_by_country, color = Continent)) +
-  geom_point(show.legend = FALSE) +
-  scale_color_viridis(discrete = T) +
-  geom_smooth(method = "glm",
-              method.args = list(family = "quasipoisson"), # Closest match to neg. binomial in ggplot
-              formula = y ~ scale(x), alpha = 0.15,
-              se = TRUE, show.legend = FALSE) +
-  scale_x_continuous(labels = function(x) round(exp(x)-1, -1)) + # Convert log-scale to original
-  scale_y_continuous(labels = function(x) round(exp(x)-1, -1)) + 
-  labs(x = expression("Bee species richness"), y = "") +
-  theme_classic()   # Move legend to bottom
 
 library(patchwork)
 # Combine the three plots with a centered legend
-combined_plot <- (area + res_inv + bees) +
+combined_plot <- (area_plot + sr_plot + ResInvs) +
   plot_layout(guides = 'collect') +
   plot_annotation(tag_levels = 'A') &
   theme(legend.position = "bottom", 
