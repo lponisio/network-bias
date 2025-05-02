@@ -143,15 +143,17 @@ vuong(M1, M_hurdle)
 ## ***********************************************
 webs_reuse <- webs_complete %>%
   filter(!is.na(years_since_pub),
-         #years_since_pub<90,
-         !is.na(webs_reuse_count))
-webs_reuse$webs_reuse_count
+         !is.na(webs_reuse_count),
+         !is.na(Continent),
+         years_since_pub<75)
 
-webs_reuse$log_years_since_pub <- datawizard::standardize(log(webs_reuse$years_since_pub))
+max(webs_reuse$years_since_pub)
+
+webs_reuse$log_years_since_pub <- datawizard::standardize(webs_reuse$years_since_pub)
 
 
 library(MASS)
-M1_nb <- glm.nb(webs_reuse_count ~ Continent *years_since_pub, data = webs_reuse)
+M1_nb <- glm.nb(webs_reuse_count ~ Continent *log_years_since_pub, data = webs_reuse)
 summary(M1_nb)
 performance::check_model(M1_nb)
 

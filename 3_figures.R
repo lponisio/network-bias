@@ -20,52 +20,28 @@ source("network-bias/src/initalize_figure.R")
 ## ***********************************************
 
 ## ***********************************************
-
-# Define color palette for continents
 continents <- unique(webs_country$Continent)
-#continent_colors <- setNames(rainbow(length(continents)), continents)
-
-# Calculate means for covariates
-log_AREA_mean <- mean(webs_country$log_AREA, na.rm = TRUE)
-log_SR_mean <- mean(webs_country$log_CL_Species_density, na.rm = TRUE)
-log_RD_mean <- mean(webs_country$log_ResInvs_Density, na.rm = TRUE)
 
 ## ***********************************************
-
-# Generate prediction data for each continent
-prediction_data <- do.call(rbind, lapply(continents, function(ct) {
-  x_seq <- seq(min(webs_country$log_ResInvs_Density, na.rm = TRUE),
-               max(webs_country$log_ResInvs_Density, na.rm = TRUE),
-               length.out = 100)
-  newdata <- data.frame(
-    Continent = ct,
-    log_ResInvs_Density = x_seq,
-    log_AREA = log_AREA_mean,
-    log_CL_Species_density = log_SR_mean
-  )
-  pred <- predict(M1, newdata = newdata, type = "link", se.fit = TRUE)
-  newdata$fit <- exp(pred$fit)
-  newdata$lwr <- exp(pred$fit - 1.96 * pred$se.fit)
-  newdata$upr <- exp(pred$fit + 1.96 * pred$se.fit)
-  return(newdata)
-}))
-
+prediction_data <- generate_prediction_data(
+  model = M1,
+  data = webs_country,
+  continents = continents,
+  xvar = "log_ResInvs_Density",
+  log_AREA_mean = mean(webs_country$log_AREA, na.rm = TRUE),
+  log_SR_mean = mean(webs_country$log_CL_Species_density, na.rm = TRUE)
+)
+## ***********************************************
 
 log_resinv_raw <- log(webs_country$ResInvs_Density)
 log_resinv_mean <- mean(log_resinv_raw, na.rm = TRUE)
 log_resinv_sd <- sd(log_resinv_raw, na.rm = TRUE)
 
-inv_standardize <- function(x, mean, sd) {
-  raw_log <- x * sd + mean
-  raw_val <- exp(raw_log)
-  round(raw_val, -2)
-}
-
 ## ***********************************************
 
 ResInvs <- ggplot(webs_country,
                aes(x = log_ResInvs_Density, y = Total_webs_by_country, color = Continent)) +
-  geom_point(show.legend = FALSE, size = 3) +
+  geom_point(show.legend = FALSE, size = 2) +
   geom_line(data = prediction_data, show.legend = FALSE,
             aes(x = log_ResInvs_Density, y = fit, color = Continent), 
             size = 1) +
@@ -75,119 +51,77 @@ ResInvs <- ggplot(webs_country,
   scale_color_viridis_d() +
   scale_fill_viridis_d() +
   scale_x_continuous(
-    labels = function(x) inv_standardize(x, mean = log_resinv_mean, sd = log_resinv_sd)
+    labels = function(x) inv_standardize_2(x, mean = log_resinv_mean, sd = log_resinv_sd)
   )+
   coord_cartesian(ylim = c(0, 175)) +
   labs(x = expression("Research Investment per km"^2), 
-       y = "Number of Networks",
-       title = "Effect of Research Investment on Network Count") +
-  theme_classic(base_size = 15) 
+       y = "") +
+  theme_classic(base_size = 12) 
 
 ResInvs
 ## ***********************************************
 
+prediction_data_sr <- generate_prediction_data(
+  model = M1,
+  data = webs_country,
+  continents = continents,
+  xvar = "log_CL_Species_density",
+  log_AREA_mean = mean(webs_country$log_AREA, na.rm = TRUE),
+  log_SR_mean = mean(webs_country$log_CL_Species_density, na.rm = TRUE)
+)
+
+## ***********************************************
 # Step 1: Get mean and SD of the unstandardized log species richness density
-log_sr_raw <- webs_country$log_CL_Species_density
+log_sr_raw <- log(webs_country$CL_Species_Density)
 log_sr_mean <- mean(log_sr_raw, na.rm = TRUE)
 log_sr_sd <- sd(log_sr_raw, na.rm = TRUE)
-
-# Step 3: Generate prediction data for each continent
-continents <- unique(webs_country$Continent)
-x_seq_sr <- seq(min(webs_country$log_CL_Species_density, na.rm = TRUE),
-                max(webs_country$log_CL_Species_density, na.rm = TRUE),
-                length.out = 100)
-
-log_resinv_mean <- mean(webs_country$log_AREA, na.rm = TRUE)
-log_area_mean <- mean(webs_country$log_AREA, na.rm = TRUE)
-
-prediction_data_sr <- do.call(rbind, lapply(continents, function(ct) {
-  newdata <- data.frame(
-    Continent = ct,
-    log_ResInvs_Density = mean(webs_country$log_ResInvs_Density, na.rm = TRUE),  # hold constant
-    log_CL_Species_density = x_seq_sr,
-    log_AREA = log_area_mean
-  )
-  pred <- predict(M1, newdata = newdata, type = "link", se.fit = TRUE)
-  
-  fit_resp <- exp(pred$fit)
-  upr_resp <- exp(pred$fit + 1.96 * pred$se.fit)
-  lwr_resp <- exp(pred$fit - 1.96 * pred$se.fit)
-  
-  cbind(newdata, fit = fit_resp, upr = upr_resp, lwr = lwr_resp)
-}))
+## ***********************************************
 
 # Step 4: Plot
 sr_plot <- ggplot(webs_country,
                   aes(x = log_CL_Species_density, y = Total_webs_by_country, color = Continent)) +
-  geom_point(show.legend = FALSE, size = 3) +
-  geom_line(data = prediction_data_sr, 
+  geom_point(show.legend = FALSE, size = 2) +
+  geom_line(data = prediction_data_sr, show.legend = FALSE,
             aes(x = log_CL_Species_density, y = fit, color = Continent), 
             size = 1) +
-  geom_ribbon(data = prediction_data_sr, 
+  geom_ribbon(data = prediction_data_sr, show.legend = FALSE,
               aes(x = log_CL_Species_density, ymin = lwr, ymax = upr, fill = Continent), 
               alpha = 0.1, inherit.aes = FALSE) +
   scale_color_viridis_d() +
   scale_fill_viridis_d() +
   scale_x_continuous(
-    labels = function(x) inv_standardize(x, mean = log_sr_mean, sd = log_sr_sd)
+    labels = function(x) inv_standardize_label(x, mean = log_sr_mean, sd = log_sr_sd)
   ) +
   coord_cartesian(ylim = c(0, 175)) +
   labs(x = "Species Richness per km²", 
-       y = "Number of Networks",
-       title = "Effect of Species Richness on Network Count") +
-  theme_classic() +
-  theme(
-    axis.text = element_text(size = 14),
-    axis.title = element_text(size = 16),
-    plot.title = element_text(size = 18)
-  ) 
+       y = "") +
+  theme_classic(base_size = 12) 
+  
 # Display plot
 sr_plot
 
 
 ## ***********************************************
 
+prediction_data_area <- generate_prediction_data(
+  model = M1,
+  data = webs_country,
+  continents = continents,
+  xvar = "log_AREA",
+  log_AREA_mean = mean(webs_country$log_AREA, na.rm = TRUE),
+  log_SR_mean = mean(webs_country$log_CL_Species_density, na.rm = TRUE)
+)
+
+## ***********************************************
 # Step 1: Get mean and SD of unstandardized log(AREA)
 log_area_raw <- log(webs_country$AREA)
 log_area_mean <- mean(log_area_raw, na.rm = TRUE)
 log_area_sd <- sd(log_area_raw, na.rm = TRUE)
 
-# Step 2: Define inverse standardization function
-inv_standardize <- function(x, mean, sd) {
-  raw_log <- x * sd + mean
-  raw_val <- exp(raw_log)
-  round(raw_val, -2)
-}
-
-# Step 3: Generate prediction data for each continent
-continents <- unique(webs_country$Continent)
-x_seq_area <- seq(min(webs_country$log_AREA, na.rm = TRUE),
-                  max(webs_country$log_AREA, na.rm = TRUE),
-                  length.out = 100)
-
-log_resinv_mean <- mean(webs_country$log_ResInvs_Density, na.rm = TRUE)
-log_sr_mean <- mean(webs_country$log_CL_Species_density, na.rm = TRUE)
-
-prediction_data_area <- do.call(rbind, lapply(continents, function(ct) {
-  newdata <- data.frame(
-    Continent = ct,
-    log_ResInvs_Density = log_resinv_mean,
-    log_CL_Species_density = log_sr_mean,
-    log_AREA = x_seq_area
-  )
-  pred <- predict(M1, newdata = newdata, type = "link", se.fit = TRUE)
-  
-  fit_resp <- exp(pred$fit)
-  upr_resp <- exp(pred$fit + 1.96 * pred$se.fit)
-  lwr_resp <- exp(pred$fit - 1.96 * pred$se.fit)
-  
-  cbind(newdata, fit = fit_resp, upr = upr_resp, lwr = lwr_resp)
-}))
-
 # Step 4: Plot
 area_plot <- ggplot(webs_country,
                     aes(x = log_AREA, y = Total_webs_by_country, color = Continent)) +
-  geom_point(show.legend = FALSE, size = 3) +
+  geom_point(show.legend = FALSE, size = 2) +
   geom_line(data = prediction_data_area, 
             aes(x = log_AREA, y = fit, color = Continent), 
             size = 1) +
@@ -197,17 +131,18 @@ area_plot <- ggplot(webs_country,
   scale_color_viridis_d() +
   scale_fill_viridis_d() +
   scale_x_continuous(
-    labels = function(x) inv_standardize(x, mean = log_area_mean, sd = log_area_sd)
+    labels = function(x) inv_standardize_2(x, mean = log_area_mean, sd = log_area_sd)
   ) +
   coord_cartesian(ylim = c(0, 175)) +
   labs(x = expression("Area (km"^2*")"), 
-       y = "Number of Networks",
-       title = "Effect of Country Area on Network Count") +
-  theme_classic() +
+       y = "Number of Networks") +
+  theme_classic(base_size = 12)  +
+  guides(color = guide_legend(nrow = 1)) +
   theme(
-    axis.text = element_text(size = 14),
-    axis.title = element_text(size = 16),
-    plot.title = element_text(size = 18)
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    legend.text = element_text(size = 9),
+    legend.box = "horizontal"
   )
 
 # Display plot
@@ -215,14 +150,11 @@ area_plot
 
 
 
-
-library(patchwork)
 # Combine the three plots with a centered legend
 combined_plot <- (area_plot + sr_plot + ResInvs) +
   plot_layout(guides = 'collect') +
   plot_annotation(tag_levels = 'A') &
-  theme(legend.position = "bottom", 
-        legend.justification = "center")
+  theme(legend.position = "bottom")
 
 ggsave(combined_plot, file = paste0(savefilepath, "/combined_plot.jpg"), height = 5, width = 12)
 
@@ -238,9 +170,54 @@ ggsave(combined_plot, file = paste0(savefilepath, "/combined_plot.jpg"), height 
 # we included continent as a random effect. 
 ## ***********************************************
 ## ***********************************************
-webs_reuse <- webs_complete %>%
-  filter(!is.na(years_since_pub),
-         years_since_pub<90)
+# Get the mean and standard deviation of the original years_since_pub
+mean_years_since_pub <- mean(webs_reuse$years_since_pub, na.rm = TRUE)
+sd_years_since_pub <- sd(webs_reuse$years_since_pub, na.rm = TRUE)
+
+# Create a prediction data frame
+new_data <- expand.grid(
+  log_years_since_pub = seq(min(webs_reuse$log_years_since_pub), max(webs_reuse$log_years_since_pub), length.out = 100),
+  Continent = unique(webs_reuse$Continent)
+)
+
+# Add predicted values + confidence intervals
+preds <- predict(M1_nb, newdata = new_data, type = "link", se.fit = TRUE)
+
+new_data <- new_data %>%
+  mutate(
+    fit = exp(preds$fit),  # inverse link
+    lwr = exp(preds$fit - 1.96 * preds$se.fit),
+    upr = exp(preds$fit + 1.96 * preds$se.fit),
+    # Reverse the standardization
+    years_since_pub = log_years_since_pub * sd_years_since_pub + mean_years_since_pub
+  )
+
+# Plot with unscaled x-axis
+ggplot() +
+  geom_point(data = webs_reuse, aes(x = years_since_pub, y = webs_reuse_count, color = Continent), alpha = 0.6) +
+  geom_line(data = new_data, aes(x = years_since_pub, y = fit, color = Continent), size = 1) +
+  geom_ribbon(data = new_data, aes(x = years_since_pub, ymin = lwr, ymax = upr, fill = Continent), 
+              alpha = 0.2, color = NA) +
+  coord_cartesian(ylim = c(0, 100)) +
+  theme_minimal(base_size = 14) +
+  labs(x = "Years Since Publication", y = "Number of Reuses") +
+  theme(legend.title = element_blank())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 reuse <- ggplot(webs_reuse,
                 aes(x = years_since_pub, y = webs_reuse_count, color = Continent)) +
