@@ -79,7 +79,7 @@ M_hurdle <- hurdle(
 )
 
 summary(M_hurdle)
-
+check_model(M_hurdle)
 # Number of observed zeros
 obs_zeros <- sum(webs_country$Total_webs_by_country == 0)
 

@@ -156,7 +156,7 @@ combined_plot <- (area_plot + sr_plot + ResInvs) +
   plot_annotation(tag_levels = 'A') &
   theme(legend.position = "bottom")
 
-ggsave(combined_plot, file = paste0(savefilepath, "/combined_plot.jpg"), height = 5, width = 12)
+ggsave(combined_plot, file = paste0(savefilepath, "/Picture2.jpg"), height = 5, width = 12)
 
 ## ***********************************************
 ## network re-use
@@ -193,59 +193,22 @@ new_data <- new_data %>%
   )
 
 # Plot with unscaled x-axis
-ggplot() +
+reuse <-ggplot() +
   geom_point(data = webs_reuse, aes(x = years_since_pub, y = webs_reuse_count, color = Continent), alpha = 0.6) +
   geom_line(data = new_data, aes(x = years_since_pub, y = fit, color = Continent), size = 1) +
   geom_ribbon(data = new_data, aes(x = years_since_pub, ymin = lwr, ymax = upr, fill = Continent), 
               alpha = 0.2, color = NA) +
   coord_cartesian(ylim = c(0, 100)) +
-  theme_minimal(base_size = 14) +
+  scale_color_viridis_d() +
+  scale_fill_viridis_d() +
+  theme_classic(base_size = 14) +
   labs(x = "Years Since Publication", y = "Number of Reuses") +
   theme(legend.title = element_blank())
 
 
+ggsave(reuse, file = paste0(savefilepath, "/Picture5.png"), height = 5, width = 12)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-reuse <- ggplot(webs_reuse,
-                aes(x = years_since_pub, y = webs_reuse_count, color = Continent)) +
-  geom_point() +
-  scale_color_viridis(discrete = TRUE) +
-  geom_smooth(
-    method = "glm",
-    method.args = list(family = "quasipoisson"),
-    formula = y ~ scale(x),
-    alpha = 0.15,
-    se = TRUE,
-    show.legend = FALSE
-  ) +
-  labs(
-    x     = "Years Since Publication",
-    y     = "Network Reuse",
-    color = "Continent",
-    fill  = "Continent"
-  ) +
-  theme_classic() +
-  theme(
-    legend.position    = "bottom",
-    legend.direction   = "horizontal",
-    legend.title       = element_text(hjust = 0.5)
-  ) +
-  guides(color = guide_legend(nrow = 1))
-
-reuse
 
 ## ***********************************************
 webs_reuse$Status <- ifelse(webs_reuse$webs_reuse_count > 0, "Reused", "Original")
