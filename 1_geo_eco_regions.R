@@ -16,6 +16,12 @@ webs_reuse_count <- webs_reuse%>%
   group_by(Web_Code)%>%
   summarise(webs_reuse_count = n()-1)
 
+
+x <- webs_reuse%>%
+  group_by(Ref_Code)%>%
+  summarise(x = n()-1)
+
+
 #webs <- merge(webs_reuse_count, webs)
 webs <- full_join(webs, webs_reuse_count, by = "Web_Code")
 
@@ -287,11 +293,51 @@ final <- left_join(final, densities, by = "ISO3")
 #take the density for each
 final$ResInvs_Density <- final$ResInvestTotal/ final$AREA_by_ISO3
 
-final[final$adm0_a3=="MUS",]$Continent <- "Africa"
-final[final$adm0_a3=="DMA",]$Continent <- "North America"
-final[final$adm0_a3=="SYC",]$Continent <- "Africa"
-final[final$adm0_a3=="GRD",]$Continent <- "North America"
+## ***********************************************
+#some countries are missing a continent. 
+## ***********************************************
+Continent_check <- final %>%
+  distinct(adm0_a3, .keep_all = TRUE) %>%
+  filter(is.na(Continent),
+         !is.na(AREA) , 
+         !is.na(ResInvs_Density) ,
+         !is.na(CL_Species_Density))
 
+# Make sure the join key matches
+names(continents)[names(continents) == "ISO.alpha3.Code"] <- "adm0_a3"
+
+dim(final)
+sum(is.na(final$adm0_a3))
+# Join UN continent info to the main dataframe
+final <- left_join(final, continents[, c("adm0_a3", "Region.Name")], by = "adm0_a3")
+dim(final)
+sum(is.na(final$adm0_a3))
+
+# Fill in missing 'Continent' values using 'Region.Name' from the UN dataset
+final <- final %>%
+  mutate(Continent = if_else(is.na(Continent), Region.Name, Continent)) %>%
+  dplyr::select(-Region.Name)  # remove helper column if not needed
+
+Continent_check <- final %>%
+  distinct(adm0_a3, .keep_all = TRUE) %>%
+  filter(is.na(Continent),
+         !is.na(AREA) , 
+         !is.na(ResInvs_Density) ,
+         !is.na(CL_Species_Density))
+
+unique(final$Continent)
+
+dim(final)
+sum(is.na(final$adm0_a3))
+sum(is.na(final$Continent))
+final <- final %>%
+  mutate(Continent = case_when(
+    Continent == "Americas" & Hemisphere == "Northern" ~ "North America",
+    Continent == "Americas" & Hemisphere == "Southern" ~ "South America",
+    TRUE ~ Continent
+  ))
+dim(final)
+sum(is.na(final$Continent))
 
 ## ***********************************************
 write.csv(final, file = "saved/webs_complete.csv")
