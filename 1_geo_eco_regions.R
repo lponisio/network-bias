@@ -17,7 +17,8 @@ webs_reuse_count <- webs_reuse%>%
   summarise(webs_reuse_count = n()-1)
 
 #webs <- merge(webs_reuse_count, webs)
-webs <- left_join(webs, webs_reuse_count, by = "Web_Code")
+webs <- full_join(webs, webs_reuse_count, by = "Web_Code")
+
 
 ## ***********************************************
 ## Cleaning the webs dataframe
@@ -179,7 +180,6 @@ final$ISO3[is.na(final$ISO3) | final$ISO3 == ""] <- final$adm0_a3[is.na(final$IS
 #adding GDP median
 final <- left_join(final, gdp[, c("ISO3", "GDP.MEDIAN")], by = join_by(ISO3))
 
-hist(final$GDP.MEDIAN)
 
 #Research and development expenditure (% of GDP), 
 #https://databank.worldbank.org/reports.aspx?source=2&type=metadata&series=GB.XPD.RSDV.GD.ZS#
@@ -286,6 +286,11 @@ final <- left_join(final, densities, by = "ISO3")
 
 #take the density for each
 final$ResInvs_Density <- final$ResInvestTotal/ final$AREA_by_ISO3
+
+final[final$adm0_a3=="MUS",]$Continent <- "Africa"
+final[final$adm0_a3=="DMA",]$Continent <- "North America"
+final[final$adm0_a3=="SYC",]$Continent <- "Africa"
+final[final$adm0_a3=="GRD",]$Continent <- "North America"
 
 
 ## ***********************************************

@@ -53,7 +53,7 @@ ResInvs <- ggplot(webs_country,
   scale_x_continuous(
     labels = function(x) inv_standardize_2(x, mean = log_resinv_mean, sd = log_resinv_sd)
   )+
-  coord_cartesian(ylim = c(0, 175)) +
+  coord_cartesian(ylim = c(0, 100)) +
   labs(x = expression("Research Investment per km"^2), 
        y = "") +
   theme_classic(base_size = 12) 
@@ -92,7 +92,7 @@ sr_plot <- ggplot(webs_country,
   scale_x_continuous(
     labels = function(x) inv_standardize_label(x, mean = log_sr_mean, sd = log_sr_sd)
   ) +
-  coord_cartesian(ylim = c(0, 175)) +
+  coord_cartesian(ylim = c(0, 100)) +
   labs(x = "Species Richness per km²", 
        y = "") +
   theme_classic(base_size = 12) 
@@ -133,7 +133,7 @@ area_plot <- ggplot(webs_country,
   scale_x_continuous(
     labels = function(x) inv_standardize_2(x, mean = log_area_mean, sd = log_area_sd)
   ) +
-  coord_cartesian(ylim = c(0, 175)) +
+  coord_cartesian(ylim = c(0, 100)) +
   labs(x = expression("Area (km"^2*")"), 
        y = "Number of Networks") +
   theme_classic(base_size = 12)  +
@@ -198,7 +198,7 @@ reuse <-ggplot() +
   geom_line(data = new_data, aes(x = years_since_pub, y = fit, color = Continent), size = 1) +
   geom_ribbon(data = new_data, aes(x = years_since_pub, ymin = lwr, ymax = upr, fill = Continent), 
               alpha = 0.2, color = NA) +
-  coord_cartesian(ylim = c(0, 100)) +
+  coord_cartesian(ylim = c(0, 50)) +
   scale_color_viridis_d() +
   scale_fill_viridis_d() +
   theme_classic(base_size = 14) +
@@ -210,35 +210,6 @@ ggsave(reuse, file = paste0(savefilepath, "/Picture5.png"), height = 5, width = 
 
 
 
-## ***********************************************
-webs_reuse$Status <- ifelse(webs_reuse$webs_reuse_count > 0, "Reused", "Original")
-
-yearly_counts <- webs_reuse %>%
-  filter(!is.na(webs_reuse_count))%>%
-  group_by(Publi_Year, Continent, Status) %>%
-  summarise(count = n(), .groups = "drop")
-
-reuse <- ggplot(yearly_counts, aes(x = Publi_Year, y = count, color = Status)) +
-  geom_line() +
-  geom_point() +
-  scale_color_manual(values = c("Original" = "#1b9e77", "Reused" = "#d95f02")) +  # Match colors
-  labs(
-    x = "Year",
-    y = "Number of networks published",
-    color = "Status"
-  ) +
-  facet_wrap(~ Continent) +
-  theme_bw() +  # use a base theme with axes
-  theme(
-    legend.position = "right",
-    text = element_text(size = 14),
-    strip.background = element_blank(),
-    strip.text = element_text(face = "bold"),
-    panel.grid = element_blank(),  # remove gridlines
-    panel.border = element_rect(color = "black", fill = NA)  # adds box with axes to every panel
-  )
-ggsave(reuse, file = paste0(savefilepath, "/reuse.png"), width = 15, height = 10, dpi = 300)
-
 
 ## ***********************************************
 library(tidyverse)
@@ -246,13 +217,9 @@ library(rnaturalearth)
 library(rnaturalearthdata)
 library(sf)
 
-#webs[webs$Country == "Greenland",]$ISO3 <- "GRL"
-
 # Summarize number of networks per country
-country_summary <- webs %>%
-  distinct(adm0_a3, Total_webs_by_country) %>%
+country_summary <- webs_country %>%
   rename(value=Total_webs_by_country)
-
 
 # Load world map as an sf object
 world <- ne_countries(scale = "medium", returnclass = "sf")
@@ -261,13 +228,12 @@ world <- ne_countries(scale = "medium", returnclass = "sf")
 world_with_data <- world %>%
   left_join(country_summary, by = "adm0_a3")
 
-world_with_data[is.na(world_with_data$value),]$adm0_a3
 
-coor <- webs %>%
-  filter(!is.na(LAT.x),
-         !is.na(LAT.y),
+coor <- webs_reuse %>%
+  filter(!is.na(LAT),
+         !is.na(LONG),
          !is.na(webs_reuse_count)) %>%
-  rename(lat = LAT.x, lon = LONG, Use_Frequency = webs_reuse_count) %>%
+  rename(lat = LAT, lon = LONG, Use_Frequency = webs_reuse_count) %>%
   st_as_sf(coords = c("lon", "lat"), crs = 4326)  # convert to sf points
 
 # First, make sure to assign a new column for custom fill
@@ -279,15 +245,16 @@ map_net <- ggplot() +
   geom_sf(data = world_with_data, aes(fill = fill_value), color = "white", size = 0.1, na.rm = FALSE) +
   
   # Points
-  geom_sf(data = coor, color = "black", size = 1.6) +
+  geom_sf(data = coor, color = "black", size = 2) +
   geom_sf(data = coor, aes(color = Use_Frequency), size = 1.5) +
+
   
   # Custom fill scale
   scale_fill_gradientn(
     colours = c("grey", "#EDF8E9", "#5AAE61", "#1B7837"),
     values = scales::rescale(c(-1, 1, max(world_with_data$fill_value, na.rm = TRUE))),
     name = "Number of networks",
-    na.value = "black",
+    na.value = "#ededed",
     guide = guide_colourbar(
       direction = "horizontal",
       barheight = unit(2, "mm"),
@@ -362,12 +329,9 @@ ggsave(map_europe, file = paste0(savefilepath, "/map_net_europe.png"), width = 6
 #-----------------------------------------------
 # Load datasets
 #-----------------------------------------------
-#webs <- read.csv("network-bias-saved/raw/webs.csv", sep = ";")
-#bees <- read.csv("network-bias-saved/raw/bees_by_country.csv", sep = ",")
-#gdp  <- read.csv("network-bias-saved/raw/gdp.csv", sep = ",")
 
 # Summarize number of networks per country
-country_summary <- webs %>%
+country_summary <- webs_complete %>%
   distinct(adm0_a3, Total_webs_by_country, CL_Species, ResInvs_Density, ResInvestTotal) %>%
   filter(!is.na(Total_webs_by_country) & 
            !is.na(ResInvs_Density) & 

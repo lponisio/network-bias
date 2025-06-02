@@ -201,6 +201,41 @@ se.boot <- function(largeModel,
   return(se.param)
 }
 
+write_latex_table <- function(df, file, columns = NULL) {
+  if (!is.null(columns)) {
+    df <- df[, columns, drop = FALSE]
+  }
+  
+  # Replace _ with space, escape &
+  clean_latex <- function(x) {
+    x <- gsub("&", "\\\\&", x)     # escape &
+    x <- gsub("_", " ", x)         # replace _ with space
+    return(x)
+  }
+  
+  # Start LaTeX table lines
+  lines <- c()
+  col_align <- paste(rep("l", ncol(df)), collapse = "")
+  lines <- c(lines, paste0("\\begin{tabular}{", col_align, "}"))
+  lines <- c(lines, "\\hline")
+  
+  # Header
+  header <- paste(names(df), collapse = " & ")
+  lines <- c(lines, paste0(header, " \\\\"))
+  lines <- c(lines, "\\hline")
+  
+  # Data rows
+  for (i in 1:nrow(df)) {
+    row <- sapply(df[i, ], clean_latex)
+    lines <- c(lines, paste0(paste(row, collapse = " & "), " \\\\"))
+  }
+  
+  lines <- c(lines, "\\hline", "\\end{tabular}")
+  
+  # Write to file
+  writeLines(lines, con = file)
+}
+
 
 
 
