@@ -62,9 +62,14 @@ webs_country$log_CL_Species <- datawizard::standardize(log(webs_country$CL_Speci
 webs_country$log_CL_Species_density <- datawizard::standardize(log(webs_country$CL_Species_Density))
 webs_country$log_ResInvs_Density <- datawizard::standardize(log(webs_country$ResInvs_Density))
 
-hist(webs_country$Total_webs_by_country)
+hist(webs_country[webs_country$Continent=="Africa",]$Total_webs_by_country)
+x<-webs_country[webs_country$Continent=="Europe",]
+
 hist(webs_country$log_ResInvs_Density)
 hist(webs_country$log_CL_Species_density)
+
+
+#webs_country<-webs_country[webs_country$Total_webs_by_country<50,]
 
 ## ***********************************************
 M1 <- glm.nb(Total_webs_by_country ~ Continent+
@@ -75,6 +80,53 @@ M1 <- glm.nb(Total_webs_by_country ~ Continent+
 
 summary(M1)
 check_model(M1)
+
+# Fit zero-inflated negative binomial with centered predictor
+M1_nb_zi <- glmmTMB(Total_webs_by_country ~ Continent+
+                      log_ResInvs_Density +
+                      log_AREA +
+                      log_CL_Species_density,
+                    ziformula = ~1,
+                    family = nbinom2,
+                    data = webs_country)
+
+summary(M1_nb_zi)
+check_model(M1_nb_zi)
+
+
+M1_pois <- glm(Total_webs_by_country ~ Continent +
+                 log_ResInvs_Density +
+                 log_AREA +
+                 log_CL_Species_density,
+               family = poisson(link = "log"),
+               data = webs_country)
+summary(M1_pois)
+check_model(M1_pois)
+
+#still bad
+# M1_pois <- glm(Total_webs_by_country ~ Continent +
+#                  log_ResInvs_Density +
+#                  log_AREA +
+#                  log_CL_Species_density,
+#                family = poisson(link = "log"),
+#                data = webs_country)
+# summary(M1_pois)
+# check_model(M1_pois)
+
+
+#no good
+# webs_country$Total_webs_by_country_log <- log(webs_country$Total_webs_by_country + 1)
+# library(lme4)
+# M1_lmm <- lm(Total_webs_by_country_log ~  Continent+
+#                  log_ResInvs_Density +
+#                  log_AREA +
+#                  log_CL_Species_density,
+#                data = webs_country)
+# 
+# coef_summary <- coef(summary(M1_lmm))
+# performance::check_model(M1_lmm)
+
+
 
 ## ***********************************************
 ## network re-use
@@ -89,7 +141,7 @@ check_model(M1)
 ## ***********************************************
 webs_reuse <- webs_complete %>%
   filter(!is.na(years_since_pub),
-         !is.na(webs_reuse_count),
+         !is.na(pub_count),
          !is.na(Continent),
          years_since_pub<75)
 
@@ -104,8 +156,8 @@ not_in_analysis <- webs_complete %>%
 
 
 ## ***********************************************
-write.csv(not_in_analysis[,c("Country", "Web_Code", "webs_reuse_count", "Publi_Year")], file = "network-bias-saved/cleaning/offically_dropped/not_in_analysis_model2.csv")
-write.csv(webs_country[,c("adm0_a3","Country","Web_Code","webs_reuse_count")], file = "network-bias-saved/cleaning/offically_dropped/in_analysis_model2.csv")
+write.csv(not_in_analysis[,c("Country", "Web_Code", "pub_count")], file = "network-bias-saved/cleaning/offically_dropped/not_in_analysis_model2.csv")
+write.csv(webs_country[,c("adm0_a3","Country","Web_Code","pub_count")], file = "network-bias-saved/cleaning/offically_dropped/in_analysis_model2.csv")
 
 write_latex_table(not_in_analysis, 
                   file = "network-bias-saved/cleaning/offically_dropped/not_in_analysis_model2.txt", 
@@ -121,10 +173,65 @@ write_latex_table(webs_complete[webs_complete$Total_webs_by_country>0,],
 
 webs_reuse$log_years_since_pub <- datawizard::standardize(webs_reuse$years_since_pub)
 
-library(MASS)
-M1_nb <- glm.nb(webs_reuse_count ~ Continent *log_years_since_pub, data = webs_reuse)
+library(glmmTMB)
+library(performance)
+
+M1_nb <- glmmTMB(pub_count ~ Continent * log_years_since_pub + (1 | Web_Code_base),
+                 family = nbinom2,
+                 data = webs_reuse)
+
 summary(M1_nb)
 performance::check_model(M1_nb)
+
+
+#the same as nb
+# M1_pois <- glmmTMB(pub_count ~ Continent * log_years_since_pub + (1 | Web_Code_base),
+#                    family = poisson(),
+#                    data = webs_reuse)
+# 
+# summary(M1_pois)
+
+webs_reuse$log_pub_count <- log(webs_reuse$pub_count + 1)
+
+library(lme4)
+
+M1_lmm <- lmer(log_pub_count ~ Continent * log_years_since_pub + (1 | Web_Code_base),
+               data = webs_reuse)
+
+coef_summary <- coef(summary(M1_lmm))
+coef_df <- as.data.frame(coef_summary)
+
+coef_df$stars <- cut(coef_df$`Pr(>|t|)`,
+                     breaks = c(-Inf, 0.001, 0.01, 0.05, 0.1, Inf),
+                     labels = c("***", "**", "*", ".", ""),
+                     right = TRUE)
+
+coef_df
+
+performance::check_model(M1_lmm)
+
+
+
+# #bad
+# M1_nb_zi <- glmmTMB(pub_count ~ Continent * log_years_since_pub + (1 | Web_Code_base),
+#                     ziformula = ~1,
+#                     family = nbinom2,
+#                     data = webs_reuse)
+# 
+# summary(M1_nb_zi)
+# performance::check_model(M1_nb_zi)
+
+# #bad
+# M1_nb_quad <- glmmTMB(pub_count ~ Continent * log_years_since_pub + I(log_years_since_pub^2) + (1 | Web_Code_base),
+#                       family = nbinom2,
+#                       data = webs_reuse)
+# 
+# 
+# summary(M1_nb_quad)
+# performance::check_model(M1_nb_quad)
+
+
+
 
 ## ***********************************************
 

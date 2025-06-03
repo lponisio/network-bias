@@ -13,24 +13,35 @@ source("network-bias/src/initailize.R")
 ## ***********************************************
 
 webs_reuse_count <- webs_reuse%>%
-  group_by(Web_Code)%>%
-  summarise(webs_reuse_count = n()-1)
+  group_by(Web_Code,Web_Year )%>%
+  summarise(RefCode_string = str_c(Ref_Code, collapse = "; "),
+            Publication_string = str_c(Source, collapse = "; "))
+
+webs_reuse_summary <- webs_reuse_count %>%
+  mutate(
+    Web_Code_base = str_extract(Web_Code, ".*?\\d{4}"),
+    is_reused_in_refcode = str_detect(RefCode_string, Web_Code_base),
+    RefCode_string = if_else(
+      !is_reused_in_refcode,
+      str_c(RefCode_string, Web_Code_base, sep = "; "),
+      RefCode_string
+    ),
+    pub_count = str_count(RefCode_string, ";") 
+  )
 
 
-x <- webs_reuse%>%
-  group_by(Ref_Code)%>%
-  summarise(x = n()-1)
 
 
 #webs <- merge(webs_reuse_count, webs)
-webs <- full_join(webs, webs_reuse_count, by = "Web_Code")
+webs <- full_join(webs, webs_reuse_summary, by = "Web_Code")
 
 
 ## ***********************************************
 ## Cleaning the webs dataframe
 ## ***********************************************
 #columns to keep 
-col_keep <- c("Web_Code", "webs_reuse_count", "Publi_Year","LAT", "LONG", "Region",
+col_keep <- c("Web_Code", "pub_count","Web_Code_base", "Web_Year",
+              "RefCode_string","Publication_string","LAT", "LONG", "Region",
               "ISO3", "Hemisphere", "Country")
 
 # Keep only the specified columns
@@ -277,7 +288,7 @@ sum(is.na(final$Hemisphere))
 ## ***********************************************
 #years since publication of network
 final <- final %>%
-  mutate(years_since_pub = as.numeric(format(Sys.Date(), "%Y")) - Publi_Year)
+  mutate(years_since_pub = as.numeric(format(Sys.Date(), "%Y")) - Web_Year)
 
 #density of bee species by country
 final$CL_Species_Density <- final$CL_Species/ final$AREA
