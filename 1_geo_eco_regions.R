@@ -11,41 +11,60 @@ source("network-bias/src/initailize.R")
 ## by determinging how many times the unique web code
 ## occurs
 ## ***********************************************
+webs_reuse_count <- webs_reuse %>%
+  mutate(
+    Ref_Code_fixed = str_replace(Ref_Code, "(?<=\\d{4})_\\d+$", "")
+  ) %>%
+  group_by(Web_Code, Web_Year) %>%
+  summarise(
+    RefCode_string = str_c(Ref_Code_fixed, collapse = "; "),
+    Publication_string = str_c(Source, collapse = "; "),
+    .groups = "drop"
+  )
 
-webs_reuse_count <- webs_reuse%>%
-  group_by(Web_Code,Web_Year )%>%
-  summarise(RefCode_string = str_c(Ref_Code, collapse = "; "),
-            Publication_string = str_c(Source, collapse = "; "))
 
 webs_reuse_summary <- webs_reuse_count %>%
   mutate(
-    Web_Code_base = str_extract(Web_Code, ".*?\\d{4}"),
+    Web_Code_base = Web_Code %>%
+      str_replace("(?<=\\d{4})(_[A-Za-z]{2,}\\d*|_\\d+)$", ""),
     is_reused_in_refcode = str_detect(RefCode_string, Web_Code_base),
     RefCode_string = if_else(
       !is_reused_in_refcode,
       str_c(RefCode_string, Web_Code_base, sep = "; "),
       RefCode_string
     ),
-    pub_count = str_count(RefCode_string, ";") 
+    pub_count = str_count(RefCode_string, ";")
   )
 
+webs_reuse <- webs_reuse %>%
+  distinct(Web_Code, .keep_all = TRUE)
 
+
+webs_reuse_summary <- full_join(webs_reuse, webs_reuse_summary, by = c("Web_Code", "Web_Year"))
+
+#columns to keep 
+col_keep <- c("Web_Code", "pub_count","Web_Code_base", "Web_Year",
+              "RefCode_string","Publication_string", 
+              "ISO3", "Hemisphere", "Country")
+
+# Keep only the specified columns
+webs_reuse_summary <- webs_reuse_summary[, col_keep, drop = FALSE]
 
 
 #webs <- merge(webs_reuse_count, webs)
-webs <- full_join(webs, webs_reuse_summary, by = "Web_Code")
-
+webs <- full_join(webs, webs_reuse_summary, by = c("Web_Code", "Country","ISO3","Hemisphere" ))
 
 ## ***********************************************
 ## Cleaning the webs dataframe
 ## ***********************************************
 #columns to keep 
 col_keep <- c("Web_Code", "pub_count","Web_Code_base", "Web_Year",
-              "RefCode_string","Publication_string","LAT", "LONG", "Region",
-              "ISO3", "Hemisphere", "Country")
-
+                                 "RefCode_string","Publication_string","LAT", "LONG", "Region",
+                                 "ISO3", "Hemisphere", "Country")
+ 
 # Keep only the specified columns
 webs <- webs[, col_keep, drop = FALSE]
+
 
 # Standardize and validate country names
 x <-unique(webs$Country)
@@ -71,8 +90,9 @@ setdiff(y,x)
 
 ## ## webs without countries, nothing we can do here
 dim(webs)
-webs <- webs %>% filter(!is.na(Country) & Country != "",
-                        !is.na(ISO3) & ISO3 != "")
+webs_na <- webs %>% 
+            filter(is.na(Country) & Country != "",
+                  is.na(ISO3) & ISO3 != "")
 dim(webs)
 
 countries.with.webs <-unique(webs$ISO3)

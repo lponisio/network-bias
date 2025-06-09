@@ -72,38 +72,28 @@ hist(webs_country$log_CL_Species_density)
 #webs_country<-webs_country[webs_country$Total_webs_by_country<50,]
 
 ## ***********************************************
-M1 <- glm.nb(Total_webs_by_country ~ Continent+
-               log_ResInvs_Density +
-                log_AREA +
-                log_CL_Species_density,
-                data = webs_country)
-
-summary(M1)
-check_model(M1)
-
-# Fit zero-inflated negative binomial with centered predictor
-M1_nb_zi <- glmmTMB(Total_webs_by_country ~ Continent+
-                      log_ResInvs_Density +
-                      log_AREA +
-                      log_CL_Species_density,
-                    ziformula = ~1,
-                    family = nbinom2,
-                    data = webs_country)
-
-summary(M1_nb_zi)
-check_model(M1_nb_zi)
-
-
-M1_pois <- glm(Total_webs_by_country ~ Continent +
-                 log_ResInvs_Density +
-                 log_AREA +
-                 log_CL_Species_density,
-               family = poisson(link = "log"),
-               data = webs_country)
-summary(M1_pois)
-check_model(M1_pois)
-
-#still bad
+# M1 <- glm.nb(Total_webs_by_country ~ Continent+
+#                log_ResInvs_Density +
+#                 log_AREA +
+#                 log_CL_Species_density,
+#                 data = webs_country)
+# 
+# summary(M1)
+# check_model(M1)
+# 
+# # Fit zero-inflated negative binomial with centered predictor
+# M1_nb_zi <- glmmTMB(Total_webs_by_country ~ Continent+
+#                       log_ResInvs_Density +
+#                       log_AREA +
+#                       log_CL_Species_density,
+#                     ziformula = ~1,
+#                     family = nbinom2,
+#                     data = webs_country)
+# 
+# summary(M1_nb_zi)
+# check_model(M1_nb_zi)
+# 
+# 
 # M1_pois <- glm(Total_webs_by_country ~ Continent +
 #                  log_ResInvs_Density +
 #                  log_AREA +
@@ -112,19 +102,20 @@ check_model(M1_pois)
 #                data = webs_country)
 # summary(M1_pois)
 # check_model(M1_pois)
-
-
-#no good
-# webs_country$Total_webs_by_country_log <- log(webs_country$Total_webs_by_country + 1)
-# library(lme4)
-# M1_lmm <- lm(Total_webs_by_country_log ~  Continent+
-#                  log_ResInvs_Density +
-#                  log_AREA +
-#                  log_CL_Species_density,
-#                data = webs_country)
 # 
-# coef_summary <- coef(summary(M1_lmm))
-# performance::check_model(M1_lmm)
+
+#I vote this one!
+webs_country$Total_webs_by_country_log <- log(webs_country$Total_webs_by_country + 1)
+library(lme4)
+
+M1_lmm <- lm(Total_webs_by_country_log ~  Continent+
+                 log_ResInvs_Density +
+                 log_AREA +
+                 log_CL_Species_density,
+               data = webs_country)
+
+ coef_summary <- coef(summary(M1_lmm))
+ performance::check_model(M1_lmm)
 
 
 
@@ -175,22 +166,37 @@ webs_reuse$log_years_since_pub <- datawizard::standardize(webs_reuse$years_since
 
 library(glmmTMB)
 library(performance)
+#worried about the affect of multiple networks from the same study, really take a look
+#one network can be more reused than another one. 
 
-M1_nb <- glmmTMB(pub_count ~ Continent * log_years_since_pub + (1 | Web_Code_base),
-                 family = nbinom2,
-                 data = webs_reuse)
-
-summary(M1_nb)
-performance::check_model(M1_nb)
-
-
-#the same as nb
-# M1_pois <- glmmTMB(pub_count ~ Continent * log_years_since_pub + (1 | Web_Code_base),
-#                    family = poisson(),
-#                    data = webs_reuse)
+#use just the webcode variable? 
 # 
-# summary(M1_pois)
+# M1_nb_glmm <- glmmTMB(pub_count ~ Continent * log_years_since_pub + (1 | Web_Code_base),
+#                  family = nbinom2,
+#                  data = webs_reuse)
+# 
+# summary(M1_nb_glmm)
+# performance::check_model(M1_nb_glmm)
+# 
+# 
+# #fits better but can't handle random effects
+# M1_nb <- glm.nb(pub_count ~ Continent * log_years_since_pub ,
+#                  data = webs_reuse)
+# 
+# summary(M1_nb)
+# performance::check_model(M1_nb)
+# 
+# #pretty okay....
+# M1_nb_glmer <- glmer.nb(
+#   pub_count ~ Continent * log_years_since_pub + (1 | Web_Code_base),
+#   data = webs_reuse
+# )
+# 
+# summary(M1_nb_glmer)
+# performance::check_model(M1_nb_glmer)
 
+
+#favorite fit with the random affect
 webs_reuse$log_pub_count <- log(webs_reuse$pub_count + 1)
 
 library(lme4)
