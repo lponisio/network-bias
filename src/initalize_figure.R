@@ -24,6 +24,8 @@ library(patchwork)
 #data
 webs <- read.csv("network-bias-saved/saved/webs_complete.csv")
 source("network-bias/2_models.R")
+
+
 savefilepath <- c("network-bias-saved/manuscript/figures")
 ## ***********************************************
 generate_prediction_data <- function(model, data, continents, xvar, log_AREA_mean, log_SR_mean, n_points = 100) {
@@ -51,7 +53,7 @@ generate_prediction_data <- function(model, data, continents, xvar, log_AREA_mea
 inv_standardize_2 <- function(x, mean, sd) {
   raw_log <- x * sd + mean
   raw_val <- exp(raw_log)
-  round(raw_val, -2)
+  round(raw_val, 0)
 }
 
 inv_standardize_label <- function(x, mean, sd) {

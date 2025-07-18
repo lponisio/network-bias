@@ -131,9 +131,9 @@ year_columns <- grep("^X(200[0-9]|201[0-9]|2023)$", names(gdp))
 gdp$GDP.MEDIAN <- apply(gdp[, year_columns], 1, median, na.rm = FALSE)
 
 ## remove countries with NA gdp median
-dim(gdp)
-gdp <- gdp[!is.na(gdp$GDP.MEDIAN),]
-dim(gdp)
+#dim(gdp)
+#gdp <- gdp[!is.na(gdp$GDP.MEDIAN),]
+#dim(gdp)
 
 countries.no.webs <- gdp[!gdp$ISO3 %in% countries.with.webs, c("ISO3","Country")]
 

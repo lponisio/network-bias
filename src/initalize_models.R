@@ -21,6 +21,48 @@ library(knitr)
 library(kableExtra)
 library(knitr)
 library(kableExtra)
+format_lmer_table <- function(model, caption = "Regression Results", savefilepath = "network-bias-saved/manuscript/tables") {
+  # Get model summary
+  sum_model <- summary(model)
+  
+  # Extract fixed effects and convert to data frame
+  coefs <- coef(sum_model)
+  coefs_df <- as.data.frame(coefs)
+  
+  # Store raw numeric p-values
+  raw_p <- coefs_df$`Pr(>|t|)`
+  
+  # Add significance stars BEFORE formatting p-values
+  coefs_df$Significance <- symnum(raw_p,
+                                  cutpoints = c(0, 0.001, 0.01, 0.05, 0.1, 1),
+                                  symbols = c("***", "**", "*", ".", " "))
+  
+  # Format p-values AFTER significance stars
+  coefs_df$`Pr(>|t|)` <- ifelse(is.na(raw_p), "NA",
+                                ifelse(raw_p < 2e-16, "< 2e-16",
+                                       formatC(raw_p, format = "e", digits = 2)))
+  
+  # Identify scaled terms for bolding
+  bold_rows <- grepl("scale", rownames(coefs_df))
+  
+  # Build LaTeX table
+  latex_table <- kable(coefs_df, format = "latex", booktabs = TRUE, digits = 3, align = "c",
+                       caption = caption) %>%
+    kable_styling(latex_options = c("hold_position")) %>%
+    row_spec(0, bold = TRUE, extra_latex_after = "\\hline \\hline") %>%
+    row_spec(which(bold_rows), bold = TRUE, extra_latex_after = "\\hline") %>%
+    row_spec(which(!bold_rows & rownames(coefs_df) != "(Intercept)")[1] - 1, extra_latex_after = "\\addlinespace")
+  
+  # Save to file
+  model_name <- deparse(substitute(model))
+  model_name_safe <- gsub("[^[:alnum:]_]", "_", model_name)
+  write.table(latex_table, file = paste0(savefilepath, "/", model_name_safe, "_table.txt"),
+              sep = "\t", row.names = FALSE, quote = FALSE)
+  
+  return(latex_table)
+}
+
+
 
 format_glm_table <- function(model, caption = "Regression Results", savefilepath = "network-bias-saved/manuscript/tables") {
   # Extract coefficients
@@ -200,42 +242,34 @@ se.boot <- function(largeModel,
   }
   return(se.param)
 }
-
-write_latex_table <- function(df, file, columns = NULL) {
-  if (!is.null(columns)) {
-    df <- df[, columns, drop = FALSE]
+make_latex_country_table <- function(country_vector, ncol = 3) {
+  # Remove NAs
+  country_vector <- na.omit(country_vector)
+  
+  # Calculate number of rows needed
+  n <- length(country_vector)
+  nrow <- ceiling(n / ncol)
+  
+  # Create a matrix with nrow rows and ncol columns, filling by column
+  mat <- matrix("", nrow = nrow, ncol = ncol)
+  mat[1:n] <- country_vector
+  
+  # Fill matrix by column to get desired column-wise layout
+  mat <- matrix(country_vector, ncol = ncol, byrow = FALSE)
+  
+  # Begin LaTeX tabular
+  latex_str <- "\\begin{tabular}{l l l}\n"
+  
+  for (i in 1:nrow(mat)) {
+    row_vals <- mat[i, ]
+    row_vals[is.na(row_vals)] <- ""  # clean up any trailing NA
+    latex_str <- paste0(latex_str, paste(row_vals, collapse = " & "), " \\\\\n")
   }
   
-  # Replace _ with space, escape &
-  clean_latex <- function(x) {
-    x <- gsub("&", "\\\\&", x)     # escape &
-    x <- gsub("_", " ", x)         # replace _ with space
-    return(x)
-  }
+  latex_str <- paste0(latex_str, "\\end{tabular}")
   
-  # Start LaTeX table lines
-  lines <- c()
-  col_align <- paste(rep("l", ncol(df)), collapse = "")
-  lines <- c(lines, paste0("\\begin{tabular}{", col_align, "}"))
-  lines <- c(lines, "\\hline")
-  
-  # Header
-  header <- paste(names(df), collapse = " & ")
-  lines <- c(lines, paste0(header, " \\\\"))
-  lines <- c(lines, "\\hline")
-  
-  # Data rows
-  for (i in 1:nrow(df)) {
-    row <- sapply(df[i, ], clean_latex)
-    lines <- c(lines, paste0(paste(row, collapse = " & "), " \\\\"))
-  }
-  
-  lines <- c(lines, "\\hline", "\\end{tabular}")
-  
-  # Write to file
-  writeLines(lines, con = file)
+  return(latex_str)
 }
-
 
 
 
