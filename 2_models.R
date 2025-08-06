@@ -40,8 +40,8 @@ top_countries
 # Count top 3 first authors within each of those countries
 top_authors_by_country <- webs %>%
   filter(adm0_a3 %in% top_countries$adm0_a3) %>%
-  count(adm0_a3, FirstAuthor, name = "n_networks") %>%
-  group_by(adm0_a3) %>%
+  count(adm0_a3, FirstAuthor, Continent,  name = "n_networks") %>%
+  group_by(adm0_a3, Continent) %>%
   arrange(desc(n_networks)) %>%
   slice_head(n = 3) %>%
   ungroup()
@@ -51,8 +51,8 @@ top_authors_by_country
 # Count top 3 first authors in Global South countries
 top_authors_global_S <- webs %>%
   filter(Hemisphere == "Southern") %>%
-  count(adm0_a3, FirstAuthor, name = "n_networks") %>%
-  group_by(adm0_a3) %>%
+  count(adm0_a3, Continent, FirstAuthor, name = "n_networks") %>%
+  group_by(adm0_a3, Continent) %>%
   arrange(desc(n_networks)) %>%
   slice_head(n = 5) %>%
   ungroup()
@@ -178,7 +178,6 @@ not_in_analysis <- webs_complete %>%
   distinct(Web_Code, .keep_all = TRUE) %>%
   filter(Web_Code %in%not_in_analysis)
 
-## ***********************************************
 ## summary stats for ms
 mean(webs_reuse$pub_count)
 sd(webs_reuse$pub_count)
@@ -200,7 +199,7 @@ performance::check_model(reuse_mod)
 summary(reuse_mod)
 
 ## ***********************************************
-
+## export results
 table_country <- format_glm_table(
   network_use,
   caption = "country.mod_continent"

@@ -4,6 +4,7 @@ library(lmerTest)
 library(tidyverse)
 library(MASS)
 library(DHARMa)
+library(kableExtra)
 
 # data
 webs_complete <- read.csv("network-bias-saved/saved/webs_complete.csv")

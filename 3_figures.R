@@ -59,7 +59,7 @@ ResInvs <- ggplot(webs_country,
     labels = pretty_vals
   )+
   coord_cartesian(ylim = c(0, 100)) +
-  labs(x = expression("research investment per km"^2*""), 
+  labs(x = expression("Research investment per km"^2*""), 
        y = "") +
   theme_classic()+
   theme(
@@ -135,7 +135,7 @@ sr_plot <- ggplot(webs_country,
     labels = pretty_vals
   )+
   coord_cartesian(ylim = c(0, 100)) +
-  labs(x = expression("bee species per km"^2*" (log)"), 
+  labs(x = expression("Bee species per km"^2*" (log)"), 
        y = "Number of Networks") +theme_classic()+
   theme(
     axis.title = element_text(size = 16),       # axis titles (x and y)
@@ -186,7 +186,7 @@ area_plot <- ggplot(webs_country,
     labels = pretty_vals
   )+
   coord_cartesian(ylim = c(0, 100)) +
-  labs(x = expression("area (km"^2*")"), 
+  labs(x = expression("Area (km"^2*")"), 
        y = "Number of Networks") +
   theme_classic()  +
   theme(
