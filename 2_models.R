@@ -14,6 +14,12 @@ webs <- webs_complete%>%
 webs<-webs[!is.na(webs$Web_Code),]
 
 
+webs$FirstAuthor <- sapply(strsplit(webs$Web_Code, "_"),
+                                    function(x) x[1])
+
+##  Summary stats for ms
+
+## Countries with data in Africa
 Africa <- webs[webs$Continent=="Africa",]
 
 Africa_summary <- Africa %>%
@@ -22,17 +28,7 @@ Africa_summary <- Africa %>%
   arrange(desc(percent)) 
 unique(Africa$Web_Code_base)
 
-top_countries <- webs %>%
-  count(adm0_a3) %>%
-  mutate(percent = 100 * n / sum(n)) %>%
-  arrange(desc(percent)) %>%
-  slice_head(n = 6)
-top_countries
 
-webs$FirstAuthor <- sapply(strsplit(webs$Web_Code, "_"),
-                                    function(x) x[1])
-
-##  Summary stats for ms
 ##  Get the top 6 countries by number of networks
 top_countries <- webs %>%
   count(adm0_a3, name = "n_networks") %>%
