@@ -1,11 +1,8 @@
 rm(list=ls())
 ## ***********************************************
-# workingdirectory
-source("~/lab_paths.R")
-local.path
-setwd(local.path)
+setwd(network-bias)
 
-source("network-bias/src/initalize_models.R")
+source("src/initalize_models.R")
 
 ## ***********************************************
 

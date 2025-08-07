@@ -1,11 +1,9 @@
 rm(list=ls())
 ## ***********************************************
-#workingdirectory
-source("~/lab_paths.R")
-local.path
-setwd(local.path)
 
-source("network-bias/src/initalize_figure.R")
+setwd("network-bias")
+
+source("src/initalize_figure.R")
 
 ## ***********************************************
 ## country-level variables

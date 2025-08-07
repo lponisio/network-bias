@@ -2,13 +2,7 @@ rm(list=ls())
 library(tidyverse)
 library(dplyr)
 
-#
-setwd("~/Dropbox (University of Oregon)/")
-## setwd("/Volumes/bombus/Dropbox (University of Oregon)")
-## setwd("\Dropbox (University of Oregon)")
-setwd("C:/Users/emanu/Dropbox (University of Oregon)")
-
-setwd("network-bias-saved")
+setwd("network-bias")
 
 #reading the data
 nets <- read.csv("network_reuse.csv", sep=";")
