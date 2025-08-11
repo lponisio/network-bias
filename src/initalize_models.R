@@ -1,16 +1,20 @@
-library(performance)
-library(lme4)
-library(lmerTest)
-library(tidyverse)
-library(MASS)
-library(DHARMa)
-library(kableExtra)
+# =========================================================
+# Model Table Formatting & Bootstrap Utilities
+# =========================================================
+
+# -----------------------------
+# Data and output path settings
+# -----------------------------
 
 # data
 webs_complete <- read.csv("network-bias-saved/saved/webs_complete.csv")
 
 savefilepath <- c("network-bias-saved/manuscript/tables")
 
+
+# ---------------------------------------------------------
+# Formatter: Mixed-effects (lmer / lmerTest) → LaTeX table
+# ---------------------------------------------------------
 format_lmer_table <- function(model, caption = "Regression Results",
                               savefilepath = "network-bias-saved/manuscript/tables") {
   # Get model summary
@@ -43,7 +47,7 @@ format_lmer_table <- function(model, caption = "Regression Results",
     row_spec(0, bold = TRUE, extra_latex_after = "\\hline \\hline") %>%
     row_spec(which(bold_rows), bold = TRUE, extra_latex_after = "\\hline") %>%
     row_spec(which(!bold_rows &
-                   rownames(coefs_df) != "(Intercept)")[1] - 1,
+                     rownames(coefs_df) != "(Intercept)")[1] - 1,
              extra_latex_after = "\\addlinespace")
   
   # Save to file
@@ -58,6 +62,9 @@ format_lmer_table <- function(model, caption = "Regression Results",
 
 
 
+# -----------------------------------------------
+# Formatter: GLM / glm.nb (MASS) → LaTeX table
+# -----------------------------------------------
 format_glm_table <- function(model, caption = "Regression Results",
                              savefilepath = "network-bias-saved/manuscript/tables") {
   # Extract coefficients
@@ -73,23 +80,23 @@ format_glm_table <- function(model, caption = "Regression Results",
   # Convert p-values to formatted strings, handling very small values
   coef_table$`Pr(>|z|)` <- ifelse(coef_table$`Pr(>|z|)` < 2e-16, "< 2e-16", 
                                   formatC(coef_table$`Pr(>|z|)`,
-  format = "e",
-  digits = 2))
+                                          format = "e",
+                                          digits = 2))
   
   # Identify which rows contain scaled variables
   bold_rows <- grepl("scale", rownames(coef_table))
   
   # Generate LaTeX table (without the problematic extra header)
   latex_table <- kable(coef_table, format = "latex", booktabs = TRUE,
-  digits = 3,
-  align = "c",
+                       digits = 3,
+                       align = "c",
                        caption = caption) %>%
     kable_styling(latex_options = c("hold_position")) %>%
     row_spec(0, bold = TRUE, extra_latex_after = "\\hline \\hline") %>%
     row_spec(which(bold_rows), bold = TRUE, extra_latex_after = "\\hline") %>%
     row_spec(which(!bold_rows & rownames(coef_table) !=
-  "(Intercept)")[1] - 1,
-  extra_latex_after = "\\addlinespace")
+                     "(Intercept)")[1] - 1,
+             extra_latex_after = "\\addlinespace")
   
   # Extract model name and sanitize it for the filename
   model_name <- deparse(substitute(model))
@@ -98,14 +105,17 @@ format_glm_table <- function(model, caption = "Regression Results",
   # Save table as a .txt file with the model's name
   write.table(latex_table, file = paste0(savefilepath, "/",
                                          model_name_safe,
-  "_table.txt"),
-  sep = "\t", row.names = FALSE, quote = FALSE)
+                                         "_table.txt"),
+              sep = "\t", row.names = FALSE, quote = FALSE)
   
   return(latex_table)
 }
 
 
 
+# -------------------------------------------------------
+# Unified model runner: GLMM/GLM/LMM via family keyword
+# -------------------------------------------------------
 ## Runs models based on a formula, family, response variable, and data
 mod <- function(forms,
                 fam,
@@ -147,6 +157,9 @@ mod <- function(forms,
 }
 
 
+# -------------------------------------------------------
+# Parametric bootstrap LRT: large vs small model
+# -------------------------------------------------------
 para.boot <- function(largeModel, smallModel, nsim) {
   # Helper function to perform the bootstrap
   pboot <- function(m1, m0) {
@@ -183,6 +196,9 @@ para.boot <- function(largeModel, smallModel, nsim) {
 }
 
 
+# -------------------------------------------------------
+# Bootstrap SE for a focal parameter (by simulation)
+# -------------------------------------------------------
 se.boot <- function(largeModel,
                     smallModel,
                     param = "s.simpson.div", ## xvar of interest
@@ -207,6 +223,10 @@ se.boot <- function(largeModel,
   return(se.param)
 }
 
+
+# -------------------------------------------------------
+# LaTeX helper: multi-column country list
+# -------------------------------------------------------
 make_latex_country_table <- function(country_vector, ncol = 3) {
   # Remove NAs
   country_vector <- na.omit(country_vector)
@@ -235,8 +255,5 @@ make_latex_country_table <- function(country_vector, ncol = 3) {
   
   return(latex_str)
 }
-
-
-
 
 
