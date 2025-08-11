@@ -1,33 +1,21 @@
-
-#packages
-library(performance)
-library(lme4)
-library(dplyr)
-library(MASS)
-library(cowplot)
-library(ggplot2)
-## library(ggeffects)
-library(viridis)
-library(ggplot2)
-library(tidyverse)
-library(maps)
-library(grid) # For unit()
-
-# Load required libraries
-library(rnaturalearth)  # for world map data
-library(sf)             # for spatial data manipulation
-library(cartogram)      # for generating cartograms
-library(dplyr)
-library(ggplot2)
-library(scales)
-library(patchwork)
-#data
 webs <- read.csv("network-bias-saved/saved/webs_complete.csv")
 source("network-bias/2_models.R")
 
 
 savefilepath <- c("network-bias-saved/manuscript/figures")
-## ***********************************************
+
+# =========================================================
+# Prediction Data Generators & Inverse-Standardization Helpers
+#
+# Purpose:
+# - Create continent-wise prediction grids for plotting GLM/GLMM effects,
+#   varying one standardized log predictor at a time while holding others
+#   at their means; return fitted values and 95% Wald CIs on the response scale.
+# - Provide helpers to back-transform standardized log variables to raw units
+#   (for axis ticks and readable labels).
+# =========================================================
+
+## Build prediction grid across continents, varying one focal predictor (`xvar`)
 generate_prediction_data <- function(model, data, continents, xvar, log_AREA_mean, log_SR_mean, n_points = 100) {
   do.call(rbind, lapply(continents, function(ct) {
     x_seq <- seq(min(data[[xvar]], na.rm = TRUE),
@@ -41,21 +29,24 @@ generate_prediction_data <- function(model, data, continents, xvar, log_AREA_mea
       log_AREA = if (xvar == "log_AREA") x_seq else log_AREA_mean
     )
     
-    pred <- predict(model, newdata = newdata, type = "link", se.fit = TRUE)
+    pred <- predict(model, newdata = newdata, type = "link", se.fit = TRUE)  # predict on link scale
     newdata[[xvar]] <- x_seq
-    newdata$fit <- exp(pred$fit)
-    newdata$lwr <- exp(pred$fit - 1.96 * pred$se.fit)
+    newdata$fit <- exp(pred$fit)                                             # back-transform to response scale
+    newdata$lwr <- exp(pred$fit - 1.96 * pred$se.fit)                        # 95% Wald CI
     newdata$upr <- exp(pred$fit + 1.96 * pred$se.fit)
     
     return(newdata)
   }))
 }
+
+## Inverse of z-standardize(log(x)): x_raw = exp(x_std * sd + mean)
 inv_standardize_2 <- function(x, mean, sd) {
   raw_log <- x * sd + mean
   raw_val <- exp(raw_log)
   round(raw_val, 0)
 }
 
+## Inverse transform for axis labels (standardized log → raw), formatted in scientific notation
 inv_standardize_label <- function(x, mean, sd) {
   # Undo standardization and log transformation
   raw_log <- x * sd + mean
@@ -65,3 +56,5 @@ inv_standardize_label <- function(x, mean, sd) {
   label_func <- scales::label_scientific(digits = 2)
   label_func(raw_val)
 }
+
+
