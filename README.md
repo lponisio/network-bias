@@ -26,43 +26,43 @@ UNSD_continents.csv ( ; ) -- UN Statistics Division mapping of countries to regi
 
 ## Workflow summary
 
-# Initialization (src/) Run these in order to set paths, load packages, prepare data, fit models, and build figures.
+## Initialization (src/) Run these in order to set paths, load packages, prepare data, fit models, and build figures.
 
-## 1) Paths & output locations
+### 1) Paths & output locations
 
 source("src/lab_paths.R")
 
-## 2) Required packages
+### 2) Required packages
 
 source("src/initialize_packages.R")
 
-## 3) Data: load, standardize, merge (writes webs_complete.csv)
+### 3) Data: load, standardize, merge (writes webs_complete.csv)
 
 source("src/initalize_data.R")
 
-## 4) Models: fit and export LaTeX tables
+### 4) Models: fit and export LaTeX tables
 
 source("src/initalize_models.R")
 
-## 5) Figures: predictions, maps, panels (saves manuscript figures)
+### 5) Figures: predictions, maps, panels (saves manuscript figures)
 
 source("src/initalize_figure.R")
 
-# Macro pipeline (consolidated scripts) After the src step completes, you can run the end-to-end pipeline:
+## Macro pipeline (consolidated scripts) After the src step completes, you can run the end-to-end pipeline:
 
-## 1) Data preparation (wraps/organizes the data prep stage)
+### 1) Data preparation (wraps/organizes the data prep stage)
 
 source("1_dataPrep.R")
 
-## 2) Modeling (NB-GLM for country counts; LMM for reuse)
+### 2) Modeling (NB-GLM for country counts; LMM for reuse)
 
 source("2_models.R")
 
-## 3) Figures (prediction curves, maps, patchwork panels)
+### 3) Figures (prediction curves, maps, patchwork panels)
 
 source("3_figures.R")
 
-# Citation & data acknowledgments
+## Citation & data acknowledgments
 
 World Bank Open Data: GDP and R&D expenditure.
 
