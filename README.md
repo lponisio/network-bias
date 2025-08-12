@@ -48,7 +48,7 @@ source("src/initalize_models.R")
 
 source("src/initalize_figure.R")
 
-## Macro pipeline (consolidated scripts) After the src step completes, you can run the end-to-end pipeline:
+## Macro pipeline (consolidated scripts): After the src step completes, run the end-to-end pipeline:
 
 ### 1) Data preparation (wraps/organizes the data prep stage)
 
