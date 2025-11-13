@@ -1,8 +1,10 @@
 rm(list=ls())
-## ***********************************************
-setwd(network-bias)
+source("~/lab_paths.R")
+local.path
+setwd(local.path)
 
-source("src/initalize_packages.R")
+setwd("network-bias")
+source("src/initialize_packages.R")
 source("src/initalize_models.R")
 
 # =========================================================
@@ -107,6 +109,7 @@ webs_country <- webs_complete %>%
 ## Countries without any networks collected
 no_webs <- webs_country[is.na(webs_country$Web_Code),]
 sort(no_webs$Country)
+latex_table <- make_latex_country_table(no_webs$Country)
 
 # =========================================================
 # Exclusions & Predictor Standardization — Diagnostics
@@ -116,7 +119,6 @@ sort(no_webs$Country)
 # =========================================================
 
 # Webs excluded from analysis due to not meeting 1+ inclusion criteria
-
 not_in_analysis <- setdiff(unique(webs_complete$NAME),
                            unique(webs_country$NAME))
 
@@ -125,7 +127,6 @@ latex_table <- make_latex_country_table(sort(not_in_analysis,
 cat(latex_table)
 
 # Standardize variables and visualize their distributions
-
 webs_country$log_AREA <-
   datawizard::standardize(log(webs_country$AREA))
 webs_country$log_PropGDP_median <-
@@ -157,7 +158,6 @@ hist(webs_country$log_CL_Species_density)
 #   log_AREA (country area; standardized log)
 #   log_CL_Species_density (bee richness per km²; standardized log)
 # =========================================================
-
 # Negative binomial model 
 network_use <- glm.nb(Total_webs_by_country ~ Continent+
                         log_ResInvs_Density +
@@ -165,8 +165,13 @@ network_use <- glm.nb(Total_webs_by_country ~ Continent+
                         log_CL_Species_density,
                       data = webs_country)
 
-check_model(network_use)
+check_nb <-check_model(network_use)
 summary(network_use)
+
+# Save plot outputs
+png("model_checks/check_nb.png", width=1200, height=800)
+plot(check_nb)
+dev.off()
 
 # =========================================================
 # Network Reuse — GLMM with Time Since Publication & Country
@@ -181,56 +186,88 @@ summary(network_use)
 # =========================================================
 
 # Filter to usable records for reuse analysis (remove NAs; cap years_since_pub)
-webs_reuse <- webs_complete %>%
+webs_reuse_wOutlier <- webs_complete %>%
   filter(!is.na(years_since_pub),
          !is.na(pub_count),
-         !is.na(Continent),
-         years_since_pub < 75)
+         !is.na(Continent))
 
-# Inspect maximum years since publication after filtering
-max(webs_reuse$years_since_pub)
+#check for extreme outliers
+hist(webs_reuse_wOutlier$years_since_pub)
 
+webs_reuse_wOutlier[webs_reuse_wOutlier$years_since_pub>60,]$Web_Code
+webs_reuse_wOutlier[webs_reuse_wOutlier$years_since_pub>60,]$years_since_pub
+
+webs_reuse <- webs_reuse_wOutlier[webs_reuse_wOutlier$years_since_pub<60,]
+  
 ## Need to only be for actual web_cobe networks
 # Identify Web_Code present in complete dataset but not in reuse subset
+not_in_analysis_wOutlier <-
+  setdiff(unique(webs_complete$Web_Code), unique(webs_reuse$Web_Code))
 not_in_analysis <-
   setdiff(unique(webs_complete$Web_Code), unique(webs_reuse$Web_Code))
 
 # Keep metadata rows for those excluded codes
+not_in_analysis_wOutlier <- webs_complete %>%
+  distinct(Web_Code, .keep_all = TRUE) %>%
+  filter(Web_Code %in%not_in_analysis_wOutlier)
+
 not_in_analysis <- webs_complete %>%
   distinct(Web_Code, .keep_all = TRUE) %>%
   filter(Web_Code %in%not_in_analysis)
 
 ## Summary stats for manuscript
 # Reuse count summary (mean, SD) and mean time since publication
+mean(webs_reuse_wOutlier$pub_count)
+sd(webs_reuse_wOutlier$pub_count)
+mean(webs_reuse_wOutlier$years_since_pub)
+
+
 mean(webs_reuse$pub_count)
 sd(webs_reuse$pub_count)
-
 mean(webs_reuse$years_since_pub)
 
 # Standardize time since publication; log-transform reuse count (with small offset)
+webs_reuse_wOutlier$log_years_since_pub <-
+  datawizard::standardize(webs_reuse_wOutlier$years_since_pub)
+webs_reuse_wOutlier$log_pub_count <- log(webs_reuse_wOutlier$pub_count + .01)
+
+
 webs_reuse$log_years_since_pub <-
   datawizard::standardize(webs_reuse$years_since_pub)
-
 webs_reuse$log_pub_count <- log(webs_reuse$pub_count + .01)
 
 # GLMM model
-reuse_mod <- lmerTest::lmer(log_pub_count ~
+reuse_mod_wOutlier <- lmerTest::lmer(log_pub_count ~
                               Continent * log_years_since_pub +
                               (1 | Web_Code_base),
-                            data = webs_reuse)
+                            data = webs_reuse_wOutlier)
+
+reuse_mod <- lmerTest::lmer(log_pub_count ~
+                                       Continent * log_years_since_pub +
+                                       (1 | Web_Code_base),
+                                     data = webs_reuse)
 
 # Model diagnostics and summary
-check_model(reuse_mod)
-summary(reuse_mod)
+check_reuse_wOutlier<-check_model(reuse_mod_wOutlier)
+summary(reuse_mod_wOutlier)
+
+# Model diagnostics and summary
+check_reuse <-check_model(reuse_mod_wOutlier)
+summary(reuse_mod_wOutlier)
+# =========================================================
 
 # Export formatted tables for manuscript (GLM and LMM)
 table_country <- format_glm_table(
   network_use,
   caption = "country.mod_continent"
 )
-
 table_reuse <- format_lmer_table(
   reuse_mod,
   caption = "webs_reuse_mod"
+)
+
+table_reuse <- format_lmer_table(
+  reuse_mod_wOutlier,
+  caption = "webs_reuse_mod_wOutlier"
 )
 

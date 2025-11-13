@@ -7,16 +7,16 @@
 # -----------------------------
 
 # data
-webs_complete <- read.csv("network-bias-saved/saved/webs_complete.csv")
+webs_complete <- read.csv("../network-bias-saved/saved/webs_complete.csv")
 
-savefilepath <- c("network-bias-saved/manuscript/tables")
+savefilepath <- c("../network-bias-saved/manuscript/tables")
 
 
 # ---------------------------------------------------------
 # Formatter: Mixed-effects (lmer / lmerTest) → LaTeX table
 # ---------------------------------------------------------
 format_lmer_table <- function(model, caption = "Regression Results",
-                              savefilepath = "network-bias-saved/manuscript/tables") {
+                              savefilepath = "../network-bias-saved/manuscript/tables") {
   # Get model summary
   sum_model <- summary(model)
   
@@ -66,7 +66,7 @@ format_lmer_table <- function(model, caption = "Regression Results",
 # Formatter: GLM / glm.nb (MASS) → LaTeX table
 # -----------------------------------------------
 format_glm_table <- function(model, caption = "Regression Results",
-                             savefilepath = "network-bias-saved/manuscript/tables") {
+                             savefilepath = "../network-bias-saved/manuscript/tables") {
   # Extract coefficients
   sum_model <- summary(model)
   coef_table <- as.data.frame(sum_model$coefficients)
