@@ -449,9 +449,14 @@ sum(is.na(final$Continent))
 
 final$Country[is.na(final$Continent)]
 
-webs_complete <- final
+# =========================================================
+# Network & Author Summaries for Manuscript
+# =========================================================
+
+## Parse first author from Web_Code pattern "Author_Year_..."
+final$FirstAuthor <- sapply(strsplit(final$Web_Code, "_"),
+                           function(x) x[1])
 
 # Export final dataset
 write.csv(final, file = "../network-bias-saved/saved/webs_complete.csv")
-
 
