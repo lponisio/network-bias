@@ -1,7 +1,10 @@
 rm(list=ls())
+source("~/lab_paths.R")
+local.path
+setwd(local.path)
 
 setwd("network-bias")
-source("src/initalize_packages.R")
+source("src/initialize_packages.R")
 source("src/initalize_data.R")
 
 # =========================================================
@@ -338,7 +341,7 @@ drop_countries <- final[is.na(final$ResInvestTotal) |
                           is.na(final$AREA), ]
 
 write.csv(drop_countries,
-          file = "cleaning/offically_dropped/drop_countries.csv",
+          file = "../network-bias-saved/cleaning/offically_dropped/drop_countries.csv",
           row.names = FALSE)
 
 
@@ -449,6 +452,6 @@ final$Country[is.na(final$Continent)]
 webs_complete <- final
 
 # Export final dataset
-write.csv(final, file = "data/webs_complete.csv")
+write.csv(final, file = "../network-bias-saved/saved/webs_complete.csv")
 
 

@@ -60,6 +60,63 @@ format_lmer_table <- function(model, caption = "Regression Results",
   return(latex_table)
 }
 
+format_lmer_table_new <- function(model, caption = "Regression Results",
+                              savefilepath = "../network-bias-saved/manuscript/tables",
+                              add_stars = FALSE) {
+  
+  # Required packages
+  require(broom.mixed)
+  require(kableExtra)
+  require(dplyr)
+  
+  # Extract tidy model summary with CI
+  coefs_df <- broom.mixed::tidy(model, effects = "fixed", conf.int = TRUE) %>%
+    mutate(
+      p.value = round(p.value, 4),
+      estimate = round(estimate, 3),
+      std.error = round(std.error, 3),
+      statistic = round(statistic, 3),
+      conf.low = round(conf.low, 3),
+      conf.high = round(conf.high, 3)
+    ) %>%
+    rename(
+      Term = term,
+      Estimate = estimate,
+      SE = std.error,
+      `t-value` = statistic,
+      `p-value` = p.value,
+      CI_low = conf.low,
+      CI_high = conf.high
+    )
+  
+  # Optional: add significance-stars column only if requested
+  if (add_stars) {
+    coefs_df$Significance <- symnum(
+      coefs_df$`p-value`,
+      cutpoints = c(0, 0.001, 0.01, 0.05, 0.1, 1),
+      symbols = c("***", "**", "*", ".", " ")
+    )
+  }
+  
+  # Build clean LaTeX table
+  latex_table <- kable(
+    coefs_df,
+    format = "latex",
+    booktabs = TRUE,
+    align = "c",
+    caption = caption
+  ) %>%
+    kable_styling(latex_options = c("hold_position"))
+  
+  # Save to file
+  model_name <- deparse(substitute(model))
+  model_name_safe <- gsub("[^[:alnum:]_]", "_", model_name)
+  outfile <- file.path(savefilepath, paste0(model_name_safe, "_table.tex"))
+  
+  writeLines(latex_table, con = outfile)
+  
+  return(latex_table)
+}
 
 
 # -----------------------------------------------

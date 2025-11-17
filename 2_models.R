@@ -41,6 +41,7 @@ top_countries <- webs %>%
   slice_head(n = 6) 
 top_countries
 
+
 # Count top 3 first authors within each of those countries
 top_authors_by_country <- webs %>%
   filter(adm0_a3 %in% top_countries$adm0_a3) %>%
@@ -106,7 +107,13 @@ webs_country <- webs_complete %>%
          !is.na(ResInvs_Density) ,
          !is.na(CL_Species_Density))
 
-## Countries without any networks collected
+
+top6 <- webs_country %>%
+  filter(adm0_a3 %in% top_countries$adm0_a3) %>%
+  select(adm0_a3, Networks = Total_webs_by_country, Land_area = AREA)
+
+
+## Countries without any networks collected## CouTRUEntries without any networks collected
 no_webs <- webs_country[is.na(webs_country$Web_Code),]
 sort(no_webs$Country)
 latex_table <- make_latex_country_table(no_webs$Country)
@@ -167,6 +174,7 @@ network_use <- glm.nb(Total_webs_by_country ~ Continent+
 
 check_nb <-check_model(network_use)
 summary(network_use)
+r2_vals <- performance::r2(network_use)
 
 # Save plot outputs
 png("model_checks/check_nb.png", width=1200, height=800)
@@ -196,13 +204,12 @@ hist(webs_reuse_wOutlier$years_since_pub)
 
 webs_reuse_wOutlier[webs_reuse_wOutlier$years_since_pub>60,]$Web_Code
 webs_reuse_wOutlier[webs_reuse_wOutlier$years_since_pub>60,]$years_since_pub
-
 webs_reuse <- webs_reuse_wOutlier[webs_reuse_wOutlier$years_since_pub<60,]
   
 ## Need to only be for actual web_cobe networks
 # Identify Web_Code present in complete dataset but not in reuse subset
 not_in_analysis_wOutlier <-
-  setdiff(unique(webs_complete$Web_Code), unique(webs_reuse$Web_Code))
+  setdiff(unique(webs_complete$Web_Code), unique(webs_reuse_wOutlier$Web_Code))
 not_in_analysis <-
   setdiff(unique(webs_complete$Web_Code), unique(webs_reuse$Web_Code))
 
@@ -221,7 +228,6 @@ mean(webs_reuse_wOutlier$pub_count)
 sd(webs_reuse_wOutlier$pub_count)
 mean(webs_reuse_wOutlier$years_since_pub)
 
-
 mean(webs_reuse$pub_count)
 sd(webs_reuse$pub_count)
 mean(webs_reuse$years_since_pub)
@@ -230,7 +236,6 @@ mean(webs_reuse$years_since_pub)
 webs_reuse_wOutlier$log_years_since_pub <-
   datawizard::standardize(webs_reuse_wOutlier$years_since_pub)
 webs_reuse_wOutlier$log_pub_count <- log(webs_reuse_wOutlier$pub_count + .01)
-
 
 webs_reuse$log_years_since_pub <-
   datawizard::standardize(webs_reuse$years_since_pub)
@@ -251,11 +256,46 @@ reuse_mod <- lmerTest::lmer(log_pub_count ~
 check_reuse_wOutlier<-check_model(reuse_mod_wOutlier)
 summary(reuse_mod_wOutlier)
 
-# Model diagnostics and summary
-check_reuse <-check_model(reuse_mod_wOutlier)
-summary(reuse_mod_wOutlier)
-# =========================================================
+# Save plot outputs
+png("model_checks/check_reuse_wOutlier.png", width=1200, height=800)
+plot(check_reuse_wOutlier)
+#plot(reuse_mod_wOutlier)
+dev.off()
+png("model_checks/check_reuse.png", width=1200, height=800)
+plot(check_reuse)
+#plot(reuse_mod_wOutlier)
+dev.off()
 
+
+# Model diagnostics and summary
+check_reuse <-check_model(reuse_mod)
+summary(reuse_mod)
+# =========================================================
+library(broom.mixed)
+
+#without Outlier
+coefs <- tidy(reuse_mod, effects = "fixed", conf.int = TRUE)
+r2_vals <- performance::r2(reuse_mod)
+table_out <- coefs %>%
+  mutate(
+    marginal_R2   = r2_vals$R2_marginal,
+    conditional_R2 = r2_vals$R2_conditional
+  )
+# Write to CSV
+write.csv(table_out, "model_checks/reuse_model_table.csv", row.names = FALSE)
+
+#with Outlier
+coefs <- tidy(reuse_mod_wOutlier, effects = "fixed", conf.int = TRUE)
+r2_vals <- performance::r2(reuse_mod_wOutlier)
+table_out_wOutlier <- coefs %>%
+  mutate(
+    marginal_R2   = r2_vals$R2_marginal,
+    conditional_R2 = r2_vals$R2_conditional
+  )
+# Write to CSV
+write.csv(table_out_wOutlier, "model_checks/reuse_model_table_wOutlier.csv", row.names = FALSE)
+
+# =========================================================
 # Export formatted tables for manuscript (GLM and LMM)
 table_country <- format_glm_table(
   network_use,
@@ -266,8 +306,7 @@ table_reuse <- format_lmer_table(
   caption = "webs_reuse_mod"
 )
 
-table_reuse <- format_lmer_table(
+table_reuse <- format_lmer_table_new(
   reuse_mod_wOutlier,
   caption = "webs_reuse_mod_wOutlier"
 )
-
