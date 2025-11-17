@@ -23,7 +23,6 @@ webs$FirstAuthor <- sapply(strsplit(webs$Web_Code, "_"),
 # -------------------------------------------------------
 # Summary stats for manuscript
 # -------------------------------------------------------
-
 # Countries with data by continent (subset and percentages by adm0_a3)
 Africa <- webs[webs$Continent=="Africa",]
 
@@ -74,6 +73,7 @@ percent_area_top6 <- webs %>%
 
 print(percent_area_top6$percent_area)
 
+
 # =========================================================
 # Country-level Variables — GLM Setup & Preprocessing
 #
@@ -106,11 +106,6 @@ webs_country <- webs_complete %>%
          !is.na(AREA) , 
          !is.na(ResInvs_Density) ,
          !is.na(CL_Species_Density))
-
-
-top6 <- webs_country %>%
-  filter(adm0_a3 %in% top_countries$adm0_a3) %>%
-  select(adm0_a3, Networks = Total_webs_by_country, Land_area = AREA)
 
 
 ## Countries without any networks collected## CouTRUEntries without any networks collected
@@ -150,6 +145,37 @@ hist(log(webs_country$Total_webs_by_country + 1))
 
 hist(webs_country$log_ResInvs_Density)
 hist(webs_country$log_CL_Species_density)
+# ---------------------------------------------------------------
+# Chi-square test: Are top 6 countries overrepresented in sampling?
+# ---------------------------------------------------------------
+
+# Identify top 6 by networks
+top6 <- top_countries$adm0_a3
+
+# Observed = number of networks in top 6 vs. all other countries
+observed <- c(
+  sum(webs_country$Total_webs_by_country[webs_country$adm0_a3 %in% top6]),
+  sum(webs_country$Total_webs_by_country[!webs_country$adm0_a3 %in% top6])
+)
+#top six countries account for X% of all networks
+observed[1]/sum(observed)
+
+# Expected = share of global land area
+total_area <- sum(webs_country$AREA)
+expected <- c(
+  sum(webs_country$AREA[webs_country$adm0_a3 %in% top6]) / total_area,
+  sum(webs_country$AREA[!webs_country$adm0_a3 %in% top6]) / total_area
+)
+#percentage of land of top6 counrtries
+expected[1]
+
+# Convert expected proportions to expected counts
+expected <- expected * sum(observed)
+
+# Run chi-square test
+chisq_test_result <- chisq.test(x = observed, p = expected / sum(expected))
+
+chisq_test_result
 
 # =========================================================
 # Negative Binomial GLM — Country-level Predictors of Network Counts
