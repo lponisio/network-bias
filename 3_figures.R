@@ -1,7 +1,10 @@
 rm(list=ls())
+source("~/lab_paths.R")
+local.path
+setwd(local.path)
 
 setwd("network-bias")
-source("src/initalize_packages.R")
+source("src/initialize_packages.R")
 source("src/initalize_figure.R")
 
 # =========================================================

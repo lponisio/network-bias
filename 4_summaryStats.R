@@ -5,63 +5,55 @@ setwd(local.path)
 
 setwd("network-bias")
 source("src/initialize_packages.R")
-source("src/initalize_models.R")
+source("src/initalize_figure.R")
 
 # -------------------------------------------------------
 # Summary stats for manuscript
 # -------------------------------------------------------
-#data set cleaned for model
-webs_complete <- read.csv("data/webs_country.csv")
-
 # Countries with data by continent (subset and percentages by adm0_a3)
-Africa_summary <- webs_complete %>%
+AfricaWebSum<-sum(webs_country[webs_country$Continent=="Africa",]$Total_webs_by_country)
+
+Africa_summary <- webs_country %>%
   filter(Continent == "Africa", .keep_all =TRUE)%>%
-  mutate( sum(Total_webs_by_country))
+  mutate(percent=Total_webs_by_country/AfricaWebSum)
 
+unique(webs_complete[webs_complete$Continent=="Africa",]$Web_Code_base)
 
-  mutate(percent = 100 * n / sum(n)) %>%
-  arrange(desc(percent)) 
+## Get the top 6 countries by number of networks
+# Total number of webs globally
+GlobalWebSum <- sum(webs_country$Total_webs_by_country, na.rm = TRUE)
 
-unique(Africa$Web_Code_base)
+top_countries <- webs_country %>%
+  dplyr::select(adm0_a3, Total_webs_by_country, Country) %>%
+  mutate(percentGlobalWeb = Total_webs_by_country / GlobalWebSum) %>%
+  arrange(desc(percentGlobalWeb)) %>%
+  slice_head(n = 6)
 
-##  Get the top 6 countries by number of networks
-top_countries <- webs %>%
-  count(adm0_a3, name = "n_networks") %>%
-  mutate(percent = 100 * n_networks / sum(n_networks)) %>%
-  arrange(desc(n_networks)) %>%
-  slice_head(n = 6) 
-top_countries
+# Check percent covered by the top countries
+sum(top_countries$percentGlobalWeb)
 
 
 # Count top 3 first authors within each of those countries
-top_authors_by_country <- webs %>%
-  filter(adm0_a3 %in% top_countries$adm0_a3) %>%
+top_authors_by_continent <- webs_complete %>%
+  filter(adm0_a3 %in% top_countries$adm0_a3,
+         Total_webs_by_country != 0) %>% #filter the zero country placeholder webs
   count(adm0_a3, FirstAuthor, Continent,  name = "n_networks") %>%
   group_by(adm0_a3, Continent) %>%
   arrange(desc(n_networks)) %>%
   slice_head(n = 3) %>%
   ungroup()
-top_authors_by_country
+top_authors_by_continent
 
 # Count top 5 first authors in Southern Hemisphere countries (Global South proxy)
-top_authors_global_S <- webs %>%
-  filter(Hemisphere == "Southern") %>%
+top_authors_global_S <- webs_complete %>%
+  filter(Hemisphere == "Southern",
+         Total_webs_by_country != 0) %>%
   count(adm0_a3, Continent, FirstAuthor, name = "n_networks") %>%
   group_by(adm0_a3, Continent) %>%
   arrange(desc(n_networks)) %>%
   slice_head(n = 5) %>%
   ungroup()
 top_authors_global_S
-
-##  Calculate percent area of top 6 countries (relative to global AREA sum)
-percent_area_top6 <- webs %>%
-  distinct(adm0_a3, .keep_all = TRUE) %>%
-  summarise(
-    total_area_all = sum(AREA, na.rm = TRUE),
-    total_area_top6 = sum(AREA[adm0_a3 %in% top_countries$adm0_a3],
-                          na.rm = TRUE)
-  ) %>%
-  mutate(percent_area = total_area_top6 / total_area_all)
 
 # ---------------------------------------------------------------
 # Chi-square test: Are top 6 countries overrepresented in sampling?
