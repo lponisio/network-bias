@@ -1,8 +1,6 @@
-webs <- read.csv("network-bias-saved/saved/webs_complete.csv")
-source("network-bias/2_models.R")
-
-
-savefilepath <- c("network-bias-saved/manuscript/figures")
+webs <- read.csv("../network-bias-saved/saved/webs_complete.csv")
+source("../network-bias/2_models.R")
+savefilepath <- c("../network-bias-saved/manuscript/figures")
 
 # =========================================================
 # Prediction Data Generators & Inverse-Standardization Helpers

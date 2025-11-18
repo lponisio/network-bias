@@ -109,8 +109,6 @@ png("../network-bias-saved/manuscript/figures/modelChecks/check_nb.png", width=1
 plot(check_nb)
 dev.off()
 
-write.csv(webs_country,file = "../network-bias-saved/saved/modelData/webs_country.csv" )
-
 # =========================================================
 # Network Reuse — GLMM with Time Since Publication & Country
 #
