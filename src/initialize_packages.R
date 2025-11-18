@@ -27,3 +27,4 @@ library(scales)         # scales and formatting for visualizations
 library(sf)             # simple features for spatial data
 library(tidyverse)      # collection of data science packages
 library(viridis)        # perceptually uniform color palettes
+library(broom.mixed)
