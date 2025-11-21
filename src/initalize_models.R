@@ -313,4 +313,29 @@ make_latex_country_table <- function(country_vector, ncol = 3) {
   return(latex_str)
 }
 
+save_pairwise_latex <- function(df, file_path, caption = "Pairwise comparisons") {
+  
+  # Add stars
+  df_mod <- df %>%
+    mutate(stars = dplyr::case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE            ~ ""
+    )) %>%
+    # Drop df column if it exists
+    dplyr::select(-any_of("df")) %>%
+    dplyr::select(contrast, estimate, SE, z.ratio, p.value, stars)
+  
+  # Generate LaTeX table as a character string
+  latex_code <- kable(df_mod, format = "latex", booktabs = TRUE,
+                      caption = caption) %>%
+    kable_styling(latex_options = "hold_position") %>%
+    as.character()
+  
+  # Save to file
+  writeLines(latex_code, con = file_path)
+  
+  message("LaTeX table saved to: ", file_path)
+}
 

@@ -5,6 +5,9 @@ setwd(local.path)
 
 library(datawizard)
 library(emmeans)
+library(dplyr)
+library(knitr)
+library(kableExtra)
 
 setwd("network-bias")
 source("src/initialize_packages.R")
@@ -21,15 +24,14 @@ source("src/initalize_models.R")
 # included an interaction with each of these variables and continent
 # to allow their slopes to vary by continent.
 # =========================================================
-
 ## Drop countries considered part of global oceans because it is not a
 ## distinguishable continent
 webs_complete <- webs_complete[!webs_complete$Continent 
                                %in% c("Seven seas (open ocean)"), ]
 
 webs_complete$Continent <- factor(webs_complete$Continent,
-                                  levels=c("North America",
-                                           "South America",
+                                  levels=c("South America",
+                                           "North America",
                                            "Africa",
                                            "Europe",
                                            "Asia",
@@ -96,22 +98,79 @@ hist(webs_country$log_CL_Species_density)
 #   log_AREA (country area; standardized log)
 #   log_CL_Species_density (bee richness per km²; standardized log)
 # =========================================================
-# Negative binomial model 
-network_use <- glm.nb(Total_webs_by_country ~ Continent+
-                        log_ResInvs_Density +
-                        log_AREA +
-                        log_CL_Species_density,
-                      data = webs_country)
+### -------------------------------
+### Negative binomial model
+### -------------------------------
 
-check_nb <-check_model(network_use)
+network_use <- glm.nb(
+  Total_webs_by_country ~ Continent +
+    log_ResInvs_Density +
+    log_AREA +
+    log_CL_Species_density,
+  data = webs_country
+)
+
+# Model summary + R2
 summary(network_use)
 r2_vals <- performance::r2(network_use)
 
-# Save plot outputs
-png("../network-bias-saved/manuscript/figures/modelChecks/check_nb.png", width=1200, height=800)
+
+### -------------------------------
+### Model diagnostics
+### -------------------------------
+
+check_nb <- check_model(network_use)
+
+png(file.path(savefilepath, "figures", "modelChecks", "check_nb.png"),
+    width = 1200, height = 800)
 plot(check_nb)
 dev.off()
 
+
+### -------------------------------
+### Pairwise continent contrasts
+### -------------------------------
+
+# Estimated marginal means for continents
+emm_continent_network_use <- emmeans(network_use, specs = "Continent")
+
+# Pairwise contrasts (Tukey adjusted)
+pairwise_continent_network_use <- contrast(
+  emm_continent_network_use,
+  method = "pairwise",
+  adjust = "tukey"
+)
+
+# Convert to dataframe
+pairwise_df_network_use <- as.data.frame(pairwise_continent_network_use)
+
+# Save contrasts to CSV
+write.csv(
+  pairwise_df_network_use,
+  file.path(savefilepath, "network_use_mod_pairwise_continent.csv"),
+  row.names = FALSE
+)
+
+
+### -------------------------------
+### Create LaTeX table (custom function)
+### -------------------------------
+
+save_pairwise_latex(
+  df = pairwise_df_network_use,
+  file_path = file.path(savefilepath, "pairwise_df_network_use.txt"),
+  caption = "Pairwise comparisons of continents"
+)
+
+
+### -------------------------------
+### Format GLM summary table
+### -------------------------------
+
+table_country <- format_glm_table(
+  model = network_use,
+  caption = "country.mod_continent"
+)
 # =========================================================
 # Network Reuse — GLMM with Time Since Publication & Country
 #
@@ -220,10 +279,7 @@ write.csv(table_out_wOutlier, "../network-bias-saved/manuscript/tables/reuse_mod
 
 # =========================================================
 # Export formatted tables for manuscript (GLM and LMM)
-table_country <- format_glm_table(
-  network_use,
-  caption = "country.mod_continent"
-)
+
 table_reuse <- format_lmer_table(
   reuse_mod,
   caption = "webs_reuse_mod"
@@ -283,18 +339,6 @@ write.csv(pairwise_slopes,
           row.names = FALSE)
 
 
-# Compute pairwise comparisons (all pairwise continent contrasts)
-emm_continent_network_use <- emmeans(network_use, specs = "Continent")
-
-# Pairwise contrasts with multiplicity correction (Tukey)
-pairwise_continent_network_use <- contrast(emm_continent_network_use, method = "pairwise", adjust = "tukey")
-summary(pairwise_continent_network_use)
-
-# Save contrasts to CSV
-pairwise_df_network_use <- as.data.frame(pairwise_continent_network_use)
-write.csv(pairwise_df_network_use,
-          "../network-bias-saved/manuscript/tables/network_use_mod_pairwise_continent.csv",
-          row.names = FALSE)
 
 
 # ------------------------------------------------------------
