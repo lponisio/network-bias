@@ -3,6 +3,9 @@ source("~/lab_paths.R")
 local.path
 setwd(local.path)
 
+library(datawizard)
+library(emmeans)
+
 setwd("network-bias")
 source("src/initialize_packages.R")
 source("src/initalize_models.R")
@@ -120,76 +123,74 @@ dev.off()
 # country as explanatory variables. We included study as a random
 # effect.
 # =========================================================
-# Filter to usable records for reuse analysis (remove NAs; cap years_since_pub)
+#------------------------------------------------------------
+# Prepare datasets
+#------------------------------------------------------------
+# Filter to usable records (no NAs)
 webs_reuse_wOutlier <- webs_complete %>%
   filter(!is.na(years_since_pub),
          !is.na(pub_count),
          !is.na(Continent))
 
-#check for extreme outliers
-hist(webs_reuse_wOutlier$years_since_pub)
-webs_reuse_wOutlier[webs_reuse_wOutlier$years_since_pub>60,]$Web_Code
-webs_reuse_wOutlier[webs_reuse_wOutlier$years_since_pub>60,]$years_since_pub
-#remove outlier, do analysis for both
-webs_reuse <- webs_reuse_wOutlier[webs_reuse_wOutlier$years_since_pub<60,]
-  
-# Identify Web_Code present in complete dataset but not in reuse subset
-not_in_analysis_wOutlier <-
-  setdiff(unique(webs_complete$Web_Code), unique(webs_reuse_wOutlier$Web_Code))
-not_in_analysis <-
-  setdiff(unique(webs_complete$Web_Code), unique(webs_reuse$Web_Code))
+# Identify extreme outliers (years_since_pub > 60)
+outlier_points <- webs_reuse_wOutlier %>%
+  filter(years_since_pub > 60)
 
-# Keep metadata rows for those excluded codes
-not_in_analysis_wOutlier <- webs_complete %>%
-  distinct(Web_Code, .keep_all = TRUE) %>%
-  filter(Web_Code %in%not_in_analysis_wOutlier)
+# Remove extreme outliers for comparison
+webs_reuse <- webs_reuse_wOutlier %>%
+  filter(years_since_pub <= 60)
 
-not_in_analysis <- webs_complete %>%
-  distinct(Web_Code, .keep_all = TRUE) %>%
-  filter(Web_Code %in%not_in_analysis)
+# Standardize time and log-transform reuse count
+webs_reuse_wOutlier <- webs_reuse_wOutlier %>%
+  mutate(log_years_since_pub = standardize(years_since_pub),
+         log_pub_count = log(pub_count + 0.01))
 
-## Summary stats for manuscript
-# Reuse count summary (mean, SD) and mean time since publication
-mean(webs_reuse_wOutlier$pub_count)
-sd(webs_reuse_wOutlier$pub_count)
-mean(webs_reuse_wOutlier$years_since_pub)
+webs_reuse <- webs_reuse %>%
+  mutate(log_years_since_pub = standardize(years_since_pub),
+         log_pub_count = log(pub_count + 0.01))
 
-mean(webs_reuse$pub_count)
-sd(webs_reuse$pub_count)
-mean(webs_reuse$years_since_pub)
+#------------------------------------------------------------
+# Diagnostic plot: highlight outliers
+#------------------------------------------------------------
+p_outliers <- ggplot(webs_reuse_wOutlier, aes(x = years_since_pub, y = pub_count)) +
+  geom_point(aes(color = years_since_pub > 60), size = 3, alpha = 0.7) +
+  scale_color_manual(values = c("FALSE" = "blue", "TRUE" = "red"),
+                     labels = c("Included", "Outlier")) +
+  geom_text(data = outlier_points, aes(label = Web_Code), vjust = -2.5, hjust=.9, size = 3) +
+  theme_bw() +
+  labs(title = "Network Reuse Diagnostic: Highlighting Outliers",
+       x = "Years Since Publication",
+       y = "Number of Times Network Reused",
+       color = "Point Type")
 
-# Standardize time since publication; log-transform reuse count (with small offset)
-webs_reuse_wOutlier$log_years_since_pub <-
-  datawizard::standardize(webs_reuse_wOutlier$years_since_pub)
-webs_reuse_wOutlier$log_pub_count <- log(webs_reuse_wOutlier$pub_count + .01)
+# Print plot
+print(p_outliers)
 
-webs_reuse$log_years_since_pub <-
-  datawizard::standardize(webs_reuse$years_since_pub)
-webs_reuse$log_pub_count <- log(webs_reuse$pub_count + .01)
+# Save as PDF or PNG
+ggsave("../network-bias-saved/manuscript/figures/modelChecks/diagnostic_outliers.pdf",
+       plot = p_outliers, width = 8, height = 6)
 
-# GLMM model
-reuse_mod_wOutlier <- lmerTest::lmer(log_pub_count ~
-                              Continent * log_years_since_pub +
-                              (1 | Web_Code_base),
-                            data = webs_reuse_wOutlier)
 
-reuse_mod <- lmerTest::lmer(log_pub_count ~
-                                       Continent * log_years_since_pub +
-                                       (1 | Web_Code_base),
-                                     data = webs_reuse)
+#------------------------------------------------------------
+# Fit GLMMs (with and without outliers)
+#------------------------------------------------------------
+reuse_mod_wOutlier <- lmer(log_pub_count ~ Continent * log_years_since_pub + 
+                             (1 | Web_Code_base),
+                           data = webs_reuse_wOutlier)
 
-# Model diagnostics and summary
-check_reuse_wOutlier<-check_model(reuse_mod_wOutlier)
-summary(reuse_mod_wOutlier)
+reuse_mod <- lmer(log_pub_count ~ Continent * log_years_since_pub + 
+                    (1 | Web_Code_base),
+                  data = webs_reuse)
 
-# Model diagnostics and summary
-check_reuse<-check_model(reuse_mod)
-summary(check_reuse)
+# Model diagnostics
+check_reuse_wOutlier <- check_model(reuse_mod_wOutlier)
+check_reuse <- check_model(reuse_mod)
 
-# Save plot outputs
+# Save diagnostic plots from check_model
 png("../network-bias-saved/manuscript/figures/modelChecks/check_reuse_wOutlier.png", width=1200, height=800)
 plot(check_reuse_wOutlier)
 dev.off()
+
 png("../network-bias-saved/manuscript/figures/modelChecks/check_reuse.png", width=1200, height=800)
 plot(check_reuse)
 dev.off()
@@ -232,3 +233,50 @@ table_reuse <- format_lmer_table_new(
   reuse_mod_wOutlier,
   caption = "webs_reuse_mod_wOutlier"
 )
+
+library(lmerTest)
+library(emmeans)
+library(dplyr)
+
+# ------------------------------------------------------------
+# Likelihood Ratio Test for Continent (global effect)
+# ------------------------------------------------------------
+# Fit a reduced model without Continent (keeping all other terms)
+reuse_mod_reduced <- lmer(log_pub_count ~ log_years_since_pub + 
+                            (1 | Web_Code_base),
+                          data = webs_reuse)
+
+# Likelihood ratio test
+lrt_continent <- anova(reuse_mod_reduced, reuse_mod)
+print(lrt_continent)
+# This tests whether including Continent significantly improves model fit
+
+# Save LRT results for manuscript
+write.csv(as.data.frame(lrt_continent),
+          "../network-bias-saved/manuscript/tables/reuse_mod_LRT_continent.csv",
+          row.names = FALSE)
+
+# ------------------------------------------------------------
+# Estimated Marginal Means for Continent
+# ------------------------------------------------------------
+# Compute pairwise comparisons (all pairwise continent contrasts)
+emm_continent <- emmeans(reuse_mod, specs = "Continent")
+
+# Pairwise contrasts with multiplicity correction (Tukey)
+pairwise_continent <- contrast(emm_continent, method = "pairwise", adjust = "tukey")
+summary(pairwise_continent)
+
+# Save contrasts to CSV
+pairwise_df <- as.data.frame(pairwise_continent)
+write.csv(pairwise_df,
+          "../network-bias-saved/manuscript/tables/reuse_mod_pairwise_continent.csv",
+          row.names = FALSE)
+
+# ------------------------------------------------------------
+# Optional: Table of estimated marginal means with CI
+# ------------------------------------------------------------
+emm_df <- as.data.frame(emm_continent)
+write.csv(emm_df,
+          "../network-bias-saved/manuscript/tables/reuse_mod_emmeans_continent.csv",
+          row.names = FALSE)
+
