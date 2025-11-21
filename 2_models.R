@@ -260,17 +260,42 @@ write.csv(as.data.frame(lrt_continent),
 # Estimated Marginal Means for Continent
 # ------------------------------------------------------------
 # Compute pairwise comparisons (all pairwise continent contrasts)
-emm_continent <- emmeans(reuse_mod, specs = "Continent")
+emm_continent_reuse <- emmeans(reuse_mod, specs = "Continent")
 
 # Pairwise contrasts with multiplicity correction (Tukey)
-pairwise_continent <- contrast(emm_continent, method = "pairwise", adjust = "tukey")
-summary(pairwise_continent)
+pairwise_continent_reuse <- contrast(emm_continent_reuse, method = "pairwise", adjust = "tukey")
+summary(pairwise_continent_reuse)
 
 # Save contrasts to CSV
-pairwise_df <- as.data.frame(pairwise_continent)
-write.csv(pairwise_df,
+pairwise_df_reuse <- as.data.frame(pairwise_continent_reuse)
+write.csv(pairwise_df_reuse,
           "../network-bias-saved/manuscript/tables/reuse_mod_pairwise_continent.csv",
           row.names = FALSE)
+
+# Estimated slopes for log_years_since_pub by Continent
+slopes <- emtrends(reuse_mod, ~ Continent, var = "log_years_since_pub")
+slopes
+# Compare slopes pairwise
+pairwise_slopes <- pairs(slopes, adjust = "tukey")  # or "bonferroni"
+pairwise_slopes
+write.csv(pairwise_slopes,
+          "../network-bias-saved/manuscript/tables/reuse_mod_pairwise_slopes.csv",
+          row.names = FALSE)
+
+
+# Compute pairwise comparisons (all pairwise continent contrasts)
+emm_continent_network_use <- emmeans(network_use, specs = "Continent")
+
+# Pairwise contrasts with multiplicity correction (Tukey)
+pairwise_continent_network_use <- contrast(emm_continent_network_use, method = "pairwise", adjust = "tukey")
+summary(pairwise_continent_network_use)
+
+# Save contrasts to CSV
+pairwise_df_network_use <- as.data.frame(pairwise_continent_network_use)
+write.csv(pairwise_df_network_use,
+          "../network-bias-saved/manuscript/tables/network_use_mod_pairwise_continent.csv",
+          row.names = FALSE)
+
 
 # ------------------------------------------------------------
 # Optional: Table of estimated marginal means with CI
