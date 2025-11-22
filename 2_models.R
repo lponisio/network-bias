@@ -346,6 +346,8 @@ write.csv(
 # EMMs for Continent
 emm_continent_reuse <- emmeans(reuse_mod, ~ Continent)
 
+#this is adjusting the pvalues a lot... wondering why its so sensitve?
+#need to dig into this deeper
 # Pairwise contrasts
 pairwise_continent_reuse <- contrast(
   emm_continent_reuse,
