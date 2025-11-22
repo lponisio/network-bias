@@ -9,8 +9,8 @@
 # data
 webs_complete <- read.csv("../network-bias-saved/saved/webs_complete.csv")
 
-savefilepath <- c("../network-bias-saved/manuscript/tables")
-
+#savefilepath <- c("../network-bias-saved/manuscript/tables")
+savefilepath<-c("../network-bias-saved/manuscript")
 
 # ---------------------------------------------------------
 # Formatter: Mixed-effects (lmer / lmerTest) → LaTeX table
@@ -324,9 +324,7 @@ save_pairwise_latex <- function(df, file_path, caption = "Pairwise comparisons")
       TRUE            ~ ""
     )) %>%
     # Drop df column if it exists
-    dplyr::select(-any_of("df")) %>%
-    dplyr::select(contrast, estimate, SE, z.ratio, p.value, stars)
-  
+    dplyr::select(-any_of("df")) 
   # Generate LaTeX table as a character string
   latex_code <- kable(df_mod, format = "latex", booktabs = TRUE,
                       caption = caption) %>%
