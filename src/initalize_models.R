@@ -312,28 +312,46 @@ make_latex_country_table <- function(country_vector, ncol = 3) {
   
   return(latex_str)
 }
-
 save_pairwise_latex <- function(df, file_path, caption = "Pairwise comparisons") {
   
-  # Add stars
-  df_mod <- df %>%
-    mutate(stars = dplyr::case_when(
-      p.value < 0.001 ~ "***",
-      p.value < 0.01  ~ "**",
-      p.value < 0.05  ~ "*",
-      TRUE            ~ ""
-    )) %>%
-    # Drop df column if it exists
-    dplyr::select(-any_of("df")) 
-  # Generate LaTeX table as a character string
+  # Keep original values for detection
+  df_orig <- df
+  
+  # Identify numeric columns
+  num_cols <- names(df)[sapply(df, is.numeric)]
+  
+  # Round numeric columns to 2 decimals
+  df_round <- df %>%
+    mutate(across(all_of(num_cols), ~ round(.x, 2)))
+  
+  # Replace any rounded 0.00 with scientific notation from original value
+  for (col in num_cols) {
+    df_round[[col]] <- ifelse(
+      df_round[[col]] == 0 & df_orig[[col]] != 0,    # rounded to 0.00 but true value not zero
+      formatC(df_orig[[col]], format = "e", digits = 2),
+      df_round[[col]]
+    )
+  }
+  
+  # Add stars based on original p-values
+  df_mod <- df_round %>%
+    mutate(
+      stars = dplyr::case_when(
+        df_orig$p.value < 0.001 ~ "***",
+        df_orig$p.value < 0.01  ~ "**",
+        df_orig$p.value < 0.05  ~ "*",
+        TRUE                    ~ ""
+      )
+    ) %>%
+    dplyr::select(-any_of("df"))  # Drop df column if present
+  
+  # Build LaTeX table
   latex_code <- kable(df_mod, format = "latex", booktabs = TRUE,
                       caption = caption) %>%
     kable_styling(latex_options = "hold_position") %>%
     as.character()
   
-  # Save to file
+  # Save
   writeLines(latex_code, con = file_path)
-  
   message("LaTeX table saved to: ", file_path)
 }
-

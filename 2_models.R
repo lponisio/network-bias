@@ -23,31 +23,34 @@ source("src/initalize_models.R")
 #    Do country-level variables predict number of networks?
 ############################################################
 
-# ----------------------------------------------------------
-# 2.1 Preprocessing and Filtering
-# ----------------------------------------------------------
+## Drop countries considered part of global oceans because it is not a
+## distinguishable continent
+webs_complete <- webs_complete[!webs_complete$Continent 
+                               %in% c("Seven seas (open ocean)"), ]
 
-# Remove ocean entries (not continents)
-webs_complete <- webs_complete[
-  !webs_complete$Continent %in% c("Seven seas (open ocean)"),
-]
+webs_complete$Continent <- factor(webs_complete$Continent,
+                                  levels=c("North America",
+                                           "South America",
+                                           "Africa",
+                                           "Europe",
+                                           "Asia",
+                                           "Oceania"))
 
-# Set continent factor order
-webs_complete$Continent <- factor(
-  webs_complete$Continent,
-  levels = c("South America", "North America", "Africa",
-             "Europe", "Asia", "Oceania")
-)
-
-# Filter countries with complete data
+## Drop countries without complete data
 webs_country <- webs_complete %>%
   distinct(adm0_a3, .keep_all = TRUE) %>%
-  filter(
-    !is.na(Continent),
-    !is.na(AREA),
-    !is.na(ResInvs_Density),
-    !is.na(CL_Species_Density)
-  )
+  filter(!is.na(Continent),
+         !is.na(AREA) , 
+         !is.na(ResInvs_Density) ,
+         !is.na(CL_Species_Density))
+
+## Countries without any networks collected
+no_webs <- webs_country[is.na(webs_country$Web_Code),]
+sort(no_webs$Country)
+
+## ***********************************************************
+## Webs excluded from analysis due to not meeting 1+ inclusion
+## criteria
 
 # Countries with zero networks (for manuscript tables)
 no_webs <- webs_country[is.na(webs_country$Web_Code), ]
@@ -65,40 +68,35 @@ writeLines(
   "../network-bias-saved/manuscript/tables/latex_table_not_in_analysis.txt"
 )
 
+## ***********************************************************
+# Standardize variables and visualize their distributions
 
-# ----------------------------------------------------------
-# 2.2 Standardization of Predictors
-# ----------------------------------------------------------
+webs_country$log_AREA <-
+  datawizard::standardize(log(webs_country$AREA))
+webs_country$log_PropGDP_median <-
+  datawizard::standardize(log(webs_country$PropGDP_median))
+webs_country$log_CL_Species <-
+  datawizard::standardize(log(webs_country$CL_Species))
+webs_country$log_CL_Species_density <-
+  datawizard::standardize(log(webs_country$CL_Species_Density))
+webs_country$log_ResInvs_Density <-
+  datawizard::standardize(log(webs_country$ResInvs_Density))
 
-webs_country <- webs_country %>%
-  mutate(
-    log_AREA               = standardize(log(AREA)),
-    log_PropGDP_median     = standardize(log(PropGDP_median)),
-    log_CL_Species         = standardize(log(CL_Species)),
-    log_CL_Species_density = standardize(log(CL_Species_Density)),
-    log_ResInvs_Density    = standardize(log(ResInvs_Density))
-  )
-
-# Quick diagnostics
-hist(webs_country$Total_webs_by_country[webs_country$Continent == "Africa"])
+hist(webs_country[webs_country$Continent=="Africa",]$Total_webs_by_country)
 hist(log(webs_country$Total_webs_by_country + 1))
+
 hist(webs_country$log_ResInvs_Density)
 hist(webs_country$log_CL_Species_density)
 
-
-# ----------------------------------------------------------
-# 2.3 Negative Binomial GLM: Country-level Predictors
-# ----------------------------------------------------------
-
-network_use <- glm.nb(
-  Total_webs_by_country ~ Continent +
-    log_ResInvs_Density +
-    log_AREA +
-    log_CL_Species_density,
-  data = webs_country
-)
+# This negative binomial model accounts for dispersion
+network_use <- glm.nb(Total_webs_by_country ~ Continent+
+                        log_ResInvs_Density +
+                        log_AREA +
+                        log_CL_Species_density,
+                      data = webs_country)
 
 summary(network_use)
+check_model(network_use)
 r2_vals <- performance::r2(network_use)
 
 # Diagnostics
@@ -107,33 +105,6 @@ png(file.path(savefilepath, "figures", "modelChecks", "check_nb.png"),
     width = 1200, height = 800)
 plot(check_nb)
 dev.off()
-
-
-# ----------------------------------------------------------
-# 2.4 Pairwise continent differences (raw, unadjusted)
-# ----------------------------------------------------------
-
-emm_continent_network_use <- emmeans(network_use, ~ Continent)
-
-pairwise_continent_network_use <- contrast(
-  emm_continent_network_use,
-  method = "pairwise",
-  adjust = "none"
-)
-
-pairwise_df_network_use <- as.data.frame(pairwise_continent_network_use)
-
-write.csv(
-  pairwise_df_network_use,
-  file.path(savefilepath, "tables/network_use_mod_pairwise_continent.csv"),
-  row.names = FALSE
-)
-
-save_pairwise_latex(
-  df        = pairwise_df_network_use,
-  file_path = file.path(savefilepath, "tables/pairwise_df_network_use.txt"),
-  caption   = "Pairwise comparisons of continents"
-)
 
 # GLM table for manuscript
 table_country <- format_glm_table(
@@ -236,7 +207,7 @@ for (model_name in c("reuse_mod_wOutlier", "reuse_mod")) {
 
 table_reuse <- format_lmer_table(
   model   = reuse_mod,
-  caption = "webs_reuse_mod"
+  caption = "webs_reuse_mod_Asia"
 )
 
 table_reuse_wOutlier <- format_lmer_table_new(
@@ -261,51 +232,5 @@ write.csv(
   row.names = FALSE
 )
 
-
-# ----------------------------------------------------------
-# 3.7 Estimated marginal means — continent effects
-# ----------------------------------------------------------
-
-emm_continent_reuse <- emmeans(reuse_mod, specs = "Continent")
-
-# Raw (unadjusted) pairwise contrasts
-pairwise_continent_reuse <- contrast(
-  emm_continent_reuse,
-  method = "pairwise",
-  adjust = "none"
-)
-
-pairwise_df_reuse <- as.data.frame(pairwise_continent_reuse)
-
-write.csv(
-  pairwise_df_reuse,
-  "../network-bias-saved/manuscript/tables/reuse_mod_pairwise_continent.csv",
-  row.names = FALSE
-)
-
-save_pairwise_latex(
-  df = pairwise_df_reuse,
-  file_path = file.path(savefilepath, "tables/pairwise_df_reuse.txt"),
-  caption = "Pairwise comparisons of continents"
-)
-
-
-# ----------------------------------------------------------
-# 3.8 Slopes (effect of years since publication) by continent
-# ----------------------------------------------------------
-
-slopes <- emmeans(
-  reuse_mod,
-  specs = "Continent",
-  var   = "log_years_since_pub"
-)
-
-pairwise_slopes <- pairs(slopes, adjust = "none")
-
-write.csv(
-  as.data.frame(pairwise_slopes),
-  "../network-bias-saved/manuscript/tables/reuse_mod_pairwise_slopes.csv",
-  row.names = FALSE
-)
 
 
