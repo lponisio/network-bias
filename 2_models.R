@@ -207,7 +207,7 @@ for (model_name in c("reuse_mod_wOutlier", "reuse_mod")) {
 
 table_reuse <- format_lmer_table(
   model   = reuse_mod,
-  caption = "webs_reuse_mod_Asia"
+  caption = "webs_reuse_mod"
 )
 
 table_reuse_wOutlier <- format_lmer_table_new(
