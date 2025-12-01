@@ -7,8 +7,6 @@ source("~/lab_paths.R")
 setwd(local.path)
 
 library(dplyr)
-library(datawizard)
-library(emmeans)
 library(knitr)
 library(kableExtra)
 library(lmerTest)
@@ -119,10 +117,10 @@ table_country <- format_glm_table(
 ############################################################
 
 # ----------------------------------------------------------
-# 3.1 Data preparation
+# Data preparation
 # ----------------------------------------------------------
 
-webs_reuse_wOutlier <- webs_complete %>%
+webs_reuse <- webs_complete %>%
   filter(
     !is.na(years_since_pub),
     !is.na(pub_count),
@@ -130,31 +128,10 @@ webs_reuse_wOutlier <- webs_complete %>%
   )
 
 # Outlier identification (years > 60)
-outlier_points <- webs_reuse_wOutlier %>%
+outlier_points <- webs_reuse %>%
   filter(years_since_pub > 60)
 
-# Outliers removed dataset
-webs_reuse <- webs_reuse_wOutlier %>%
-  filter(years_since_pub <= 60)
-
-# Standardize variables
-add_transforms <- function(df) {
-  df %>%
-    mutate(
-      log_years_since_pub = standardize(years_since_pub),
-      log_pub_count       = log(pub_count + 0.01)
-    )
-}
-
-webs_reuse          <- add_transforms(webs_reuse)
-webs_reuse_wOutlier <- add_transforms(webs_reuse_wOutlier)
-
-
-# ----------------------------------------------------------
-# 3.2 Diagnostic plot for outliers
-# ----------------------------------------------------------
-
-p_outliers <- ggplot(webs_reuse_wOutlier,
+p_outliers <- ggplot(webs_reuse,
                      aes(years_since_pub, pub_count)) +
   geom_point(aes(color = years_since_pub > 60),
              size = 3, alpha = 0.7) +
@@ -168,51 +145,43 @@ p_outliers <- ggplot(webs_reuse_wOutlier,
     title = "Network Reuse Diagnostic: Highlighting Outliers",
     x = "Years Since Publication",
     y = "Times Network Reused",
-    color = "Point Type"
+    color = "over 60 years"
   ) +
   theme_bw()
 
-ggsave(
-  file.path(savefilepath, "figures", "modelChecks",
-            "diagnostic_outliers.pdf"),
-  p_outliers, width = 8, height = 6
-)
+ggsave(file.path(savefilepath, "figures", "modelChecks","diagnostic_outliers.pdf"),p_outliers, width = 8, height = 6)
 
+
+
+# Remove outliers and standardize the data
+webs_reuse <- webs_reuse %>%
+  filter(years_since_pub <= 60)%>%
+  mutate(
+    log_years_since_pub = standardize(years_since_pub),
+    log_pub_count       = log(pub_count + 0.01)
+  )
 
 # ----------------------------------------------------------
 # 3.3 Fit GLMMs (with and without outliers)
 # ----------------------------------------------------------
 
-reuse_formula <- log_pub_count ~ Continent * log_years_since_pub +
-  (1 | Web_Code_base)
+reuse_mod<- lmer(log_pub_count ~ Continent * log_years_since_pub + (1 | Web_Code_base), data = webs_reuse)
 
-reuse_mod_wOutlier <- lmer(reuse_formula, data = webs_reuse_wOutlier)
-reuse_mod          <- lmer(reuse_formula, data = webs_reuse)
+summary(network_use)
+check_reuse <-check_model(network_use)
+r2_vals <- performance::r2(network_use)
 
 # Diagnostics
-for (model_name in c("reuse_mod_wOutlier", "reuse_mod")) {
-  png(file.path(
-    savefilepath, "figures", "modelChecks",
-    paste0("check_", model_name, ".png")
-  ),
-  width = 1200, height = 800)
-  plot(check_model(get(model_name)))
-  dev.off()
-}
+check_reuse <-check_model(network_use)
 
-
-# ----------------------------------------------------------
-# 3.5 Formatted model output tables
-# ----------------------------------------------------------
+png(file.path(savefilepath, "figures", "modelChecks", "check_reuse.png"),
+    width = 1200, height = 800)
+plot(check_reuse)
+dev.off()
 
 table_reuse <- format_lmer_table(
   model   = reuse_mod,
   caption = "webs_reuse_mod"
-)
-
-table_reuse_wOutlier <- format_lmer_table_new(
-  model   = reuse_mod_wOutlier,
-  caption = "webs_reuse_mod_wOutlier"
 )
 
 
