@@ -152,27 +152,24 @@ p_outliers <- ggplot(webs_reuse,
 ggsave(file.path(savefilepath, "figures", "modelChecks","diagnostic_outliers.pdf"),p_outliers, width = 8, height = 6)
 
 
-
 # Remove outliers and standardize the data
 webs_reuse <- webs_reuse %>%
-  filter(years_since_pub <= 60)%>%
+  #filter(years_since_pub <= 60)%>%
   mutate(
     log_years_since_pub = standardize(years_since_pub),
     log_pub_count       = log(pub_count + 0.01)
   )
 
 # ----------------------------------------------------------
-# 3.3 Fit GLMMs (with and without outliers)
+# 3.2 Fit GLMMs (with and without outliers)
 # ----------------------------------------------------------
 
 reuse_mod<- lmer(log_pub_count ~ Continent * log_years_since_pub + (1 | Web_Code_base), data = webs_reuse)
 
-summary(network_use)
-check_reuse <-check_model(network_use)
-r2_vals <- performance::r2(network_use)
-
-# Diagnostics
-check_reuse <-check_model(network_use)
+#saving output
+summary(reuse_mod)
+check_reuse <-check_model(reuse_mod)
+r2_vals <- performance::r2(reuse_mod)
 
 png(file.path(savefilepath, "figures", "modelChecks", "check_reuse.png"),
     width = 1200, height = 800)
@@ -181,12 +178,30 @@ dev.off()
 
 table_reuse <- format_lmer_table(
   model   = reuse_mod,
-  caption = "webs_reuse_mod"
+  caption = "check_reuse.png"
 )
 
 
+
+library(influence.ME)
+
+infl <- influence(reuse_mod, obs = TRUE)   # obs=TRUE gives observation-level influence
+
+dfb <- dfbetas(infl)
+
+plot(dfb[, "log_years_since_pub"], type = "h")
+abline(h = c(-0.5, 0.5), lty = 2, col = "red")
+
+dfb_slope <- dfb[, "log_years_since_pub"]
+infl_idx <- which(abs(dfb_slope) > 0.5)
+
+infl_points <- webs_reuse[infl_idx, ]
+
+infl_points[, c("Web_Code_base", "years_since_pub", "pub_count", "Continent")]
+
+
 # ----------------------------------------------------------
-# 3.6 Likelihood ratio test for continent
+# 3.3 Likelihood ratio test for continent
 # ----------------------------------------------------------
 
 reuse_mod_reduced <- lmer(
