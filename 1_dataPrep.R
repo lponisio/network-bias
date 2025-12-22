@@ -299,23 +299,31 @@ final <- dplyr::left_join(
 year_columns <- grep("^X(200[0-9]|201[0-9]|2023)$", names(res.inv))
 
 # Median R&D as % of GDP over available years (require at least 5 reported years)
-res.inv$PropGDP_median <- apply(res.inv[, year_columns], 1, function(x) {
+res.inv$PropGDP_median_5 <- apply(res.inv[, year_columns], 1, function(x) {
   if (sum(!is.na(x)) >= 5) median(x, na.rm = TRUE) else NA_real_
+})
+
+res.inv$PropGDP_median_2 <- apply(res.inv[, year_columns], 1, function(x) {
+  if (sum(!is.na(x)) >= 2) median(x, na.rm = TRUE) else NA_real_
 })
 
 # Prepare for merge
 names(res.inv)[names(res.inv) == "Country.Code"] <- "ISO3"
 
 # Merge median R&D (% of GDP) into `final`
-final <- dplyr::left_join(final, res.inv[, c("ISO3", "PropGDP_median")], by = "ISO3")
+final <- dplyr::left_join(final, res.inv[, c("ISO3", "PropGDP_median_5", "PropGDP_median_2")], by = "ISO3")
 
 # Convert from % of GDP to absolute USD
 # If PropGDP_median is in percent (typical WB series), divide by 100; if already in proportion, keep as is.
-scale_factor <- ifelse(stats::median(final$PropGDP_median, na.rm = TRUE) > 1, 0.01, 1)
-final$ResInvestTotal <- final$PropGDP_median * scale_factor * final$GDP.MEDIAN  # USD
+scale_factor <- ifelse(stats::median(final$PropGDP_median_5, na.rm = TRUE) > 1, 0.01, 1)
+final$ResInvestTotal_5 <- final$PropGDP_median_5 * scale_factor * final$GDP.MEDIAN  # USD
+
+scale_factor <- ifelse(stats::median(final$PropGDP_median_2, na.rm = TRUE) > 1, 0.01, 1)
+final$ResInvestTotal_2 <- final$PropGDP_median_2 * scale_factor * final$GDP.MEDIAN  # USD
+
 
 # Quick diagnostic plot (log of positive values only to avoid -Inf)
-ri_pos <- final$ResInvestTotal[is.finite(final$ResInvestTotal) & final$ResInvestTotal > 0]
+ri_pos <- final$ResInvestTotal_2[is.finite(final$ResInvestTotal_2) & final$ResInvestTotal_2 > 0]
 hist(log(ri_pos),
      main = "Research investment (median 2000–2023)",
      xlab = "Investment in US dollars (log)",
@@ -336,7 +344,7 @@ names(area.richness)[names(area.richness) == "ISO3"] <- "adm0_a3"
 final <- dplyr::left_join(final, area.richness, by = "adm0_a3")
 
 # Save countries with missing key data (ensure folder exists)
-drop_countries <- final[is.na(final$ResInvestTotal) |
+drop_countries <- final[is.na(final$ResInvestTotal_5) |
                           is.na(final$CL_Species)    |
                           is.na(final$AREA), ]
 
@@ -399,7 +407,8 @@ densities <- final %>%
 final <- left_join(final, densities, by = "ISO3")  # attach AREA_by_ISO3
 
 ## Research investment per km²
-final$ResInvs_Density <- final$ResInvestTotal / final$AREA_by_ISO3  # USD per km²
+final$ResInvs_Density_5 <- final$ResInvestTotal_5 / final$AREA_by_ISO3  # USD per km²
+final$ResInvs_Density_2 <- final$ResInvestTotal_2 / final$AREA_by_ISO3  # USD per km²
 
 # =========================================================
 # Update Missing Continents
@@ -414,7 +423,7 @@ continent_check <- final %>%
   distinct(adm0_a3, .keep_all = TRUE) %>%
   filter(is.na(Continent),
          !is.na(AREA) , 
-         !is.na(ResInvs_Density) ,
+         !is.na(ResInvs_Density_5) ,
          !is.na(CL_Species_Density))
 continent_check
 
@@ -438,7 +447,7 @@ continent_check <- final %>%
   distinct(adm0_a3, .keep_all = TRUE) %>%
   filter(is.na(Continent),
          !is.na(AREA) , 
-         !is.na(ResInvs_Density) ,
+         !is.na(ResInvs_Density_5) ,
          !is.na(CL_Species_Density))
 continent_check
 
