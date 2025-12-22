@@ -172,7 +172,7 @@ names(gdp)[names(gdp) == "Country.Name"] <- "Country"
 year_columns <- grep("^X(200[0-9]|201[0-9]|2023)$", names(gdp))
 
 # Calculate median GDP over the selected years
-#gdp$GDP.MEDIAN <- apply(gdp[, year_columns], 1, median, na.rm = TRUE)
+#gdp$GDP.MEDIAN <- apply(gdp[, year_columns], 1, median, na.rm = FALSE)
 
 gdp$GDP.MEDIAN <- apply(gdp[, year_columns], 1, function(x) {
   if (sum(!is.na(x)) >= 5) median(x, na.rm = TRUE) else NA_real_
