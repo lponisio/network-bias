@@ -39,7 +39,7 @@ webs_country <- webs_complete %>%
   distinct(adm0_a3, .keep_all = TRUE) %>%
   filter(!is.na(Continent),
          !is.na(AREA) , 
-         !is.na(ResInvs_Density) ,
+         !is.na(ResInvs_Density_2) ,
          !is.na(CL_Species_Density))
 
 ## Countries without any networks collected
@@ -71,45 +71,70 @@ writeLines(
 
 webs_country$log_AREA <-
   datawizard::standardize(log(webs_country$AREA))
-webs_country$log_PropGDP_median <-
-  datawizard::standardize(log(webs_country$PropGDP_median))
 webs_country$log_CL_Species <-
   datawizard::standardize(log(webs_country$CL_Species))
 webs_country$log_CL_Species_density <-
   datawizard::standardize(log(webs_country$CL_Species_Density))
-webs_country$log_ResInvs_Density <-
-  datawizard::standardize(log(webs_country$ResInvs_Density))
+webs_country$log_ResInvs_Density_2 <-
+  datawizard::standardize(log(webs_country$ResInvs_Density_2))
+webs_country$log_ResInvs_Density_5 <-
+  datawizard::standardize(log(webs_country$ResInvs_Density_5))
 
 hist(webs_country[webs_country$Continent=="Africa",]$Total_webs_by_country)
 hist(log(webs_country$Total_webs_by_country + 1))
 
-hist(webs_country$log_ResInvs_Density)
+hist(webs_country$log_ResInvs_Density_2)
+hist(webs_country$log_ResInvs_Density_5)
 hist(webs_country$log_CL_Species_density)
 
 # This negative binomial model accounts for dispersion
-network_use <- glm.nb(Total_webs_by_country ~ Continent+
-                        log_ResInvs_Density +
+network_use_2 <- glm.nb(Total_webs_by_country ~ Continent+
+                        log_ResInvs_Density_2 +
                         log_AREA +
                         log_CL_Species_density,
                       data = webs_country)
 
-summary(network_use)
-check_model(network_use)
-r2_vals <- performance::r2(network_use)
+summary(network_use_2)
+check_model(network_use_2)
+r2_vals <- performance::r2(network_use_2)
 
 # Diagnostics
-check_nb <- check_model(network_use)
-png(file.path(savefilepath, "figures", "modelChecks", "check_nb.png"),
+check_nb_2 <- check_model(network_use_2)
+png(file.path(savefilepath, "figures", "modelChecks", "check_nb_2.png"),
     width = 1200, height = 800)
-plot(check_nb)
+plot(check_nb_2)
 dev.off()
 
 # GLM table for manuscript
-table_country <- format_glm_table(
-  model   = network_use,
-  caption = "country.mod_continent"
+table_country_2 <- format_glm_table(
+  model   = network_use_2,
+  caption = "country.mod_continent_2"
 )
 
+
+# This negative binomial model accounts for dispersion
+network_use_5 <- glm.nb(Total_webs_by_country ~ Continent+
+                          log_ResInvs_Density_5 +
+                          log_AREA +
+                          log_CL_Species_density,
+                        data = webs_country)
+
+summary(network_use_5)
+check_model(network_use_5)
+r2_vals <- performance::r2(network_use_5)
+
+# Diagnostics
+check_nb_5 <- check_model(network_use_5)
+png(file.path(savefilepath, "figures", "modelChecks", "check_nb_5.png"),
+    width = 1200, height = 800)
+plot(check_nb_5)
+dev.off()
+
+# GLM table for manuscript
+table_country_5 <- format_glm_table(
+  model   = network_use_5,
+  caption = "country.mod_continent_5"
+)
 
 ############################################################
 # 3. NETWORK REUSE ANALYSIS
@@ -154,9 +179,9 @@ ggsave(file.path(savefilepath, "figures", "modelChecks","diagnostic_outliers.pdf
 
 # Remove outliers and standardize the data
 webs_reuse <- webs_reuse %>%
-  #filter(years_since_pub <= 60)%>%
+  filter(years_since_pub <= 60)%>%
   mutate(
-    log_years_since_pub = standardize(years_since_pub),
+    log_years_since_pub = datawizard::standardize(years_since_pub),
     log_pub_count       = log(pub_count + 0.01)
   )
 

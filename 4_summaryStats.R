@@ -80,7 +80,7 @@ expected <- c(
 expected[1]
 
 # Convert expected proportions to expected counts
-expected <- expected * sum(observed)
+expected <- expected * sum(observed) 
 
 # Run chi-square test
 chisq_test_result <- chisq.test(x = observed, p = expected / sum(expected))
