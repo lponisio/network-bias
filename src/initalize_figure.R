@@ -14,45 +14,55 @@ savefilepath <- c("../network-bias-saved/manuscript/figures")
 # =========================================================
 
 ## Build prediction grid across continents, varying one focal predictor (`xvar`)
-generate_prediction_data <- function(model, data, continents, xvar, log_AREA_mean, log_SR_mean, n_points = 100) {
+generate_prediction_data <- function(model, data, continents, xvar,
+                                     log_AREA_mean, log_SR_mean,
+                                     n_points = 100) {
+  
+  ## helper: safe numeric extraction 
+  num <- function(v) as.numeric(v)
+  
+  ## precompute means (on numeric)
+  mean_ResInvs2 <- mean(num(data$log_ResInvs_Density_2), na.rm = TRUE)
+  mean_SRdens   <- mean(num(data$log_CL_Species_density), na.rm = TRUE)  
+  mean_AREA     <- mean(num(data$log_AREA), na.rm = TRUE)               
+  
   do.call(rbind, lapply(continents, function(ct) {
-    x_seq <- seq(min(data[[xvar]], na.rm = TRUE),
-                 max(data[[xvar]], na.rm = TRUE),
-                 length.out = n_points)
+    
+    x_seq <- seq(
+      min(num(data[[xvar]]), na.rm = TRUE),
+      max(num(data[[xvar]]), na.rm = TRUE),
+      length.out = n_points
+    )
     
     newdata <- data.frame(
       Continent = ct,
-      log_ResInvs_Density = if (xvar == "log_ResInvs_Density") x_seq else mean(data$log_ResInvs_Density, na.rm = TRUE),
-      log_CL_Species_density = if (xvar == "log_CL_Species_density") x_seq else log_SR_mean,
-      log_AREA = if (xvar == "log_AREA") x_seq else log_AREA_mean
+      
+      ## columns from the model
+      log_ResInvs_Density_2   = if (xvar == "log_ResInvs_Density_2") x_seq else mean_ResInvs2,
+      log_CL_Species_density  = if (xvar == "log_CL_Species_density") x_seq else log_SR_mean,
+      log_AREA                = if (xvar == "log_AREA") x_seq else log_AREA_mean
     )
     
-    pred <- predict(model, newdata = newdata, type = "link", se.fit = TRUE)  # predict on link scale
+    pred <- predict(model, newdata = newdata, type = "link", se.fit = TRUE)
+    
     newdata[[xvar]] <- x_seq
-    newdata$fit <- exp(pred$fit)                                             # back-transform to response scale
-    newdata$lwr <- exp(pred$fit - 1.96 * pred$se.fit)                        # 95% Wald CI
+    newdata$fit <- exp(pred$fit)
+    newdata$lwr <- exp(pred$fit - 1.96 * pred$se.fit)
     newdata$upr <- exp(pred$fit + 1.96 * pred$se.fit)
     
-    return(newdata)
+    newdata
   }))
 }
 
-## Inverse of z-standardize(log(x)): x_raw = exp(x_std * sd + mean)
-inv_standardize_2 <- function(x, mean, sd) {
-  raw_log <- x * sd + mean
-  raw_val <- exp(raw_log)
-  round(raw_val, 0)
+
+# Convert raw ticks (no log, no standardization) -> standardized-log scale used in xvar
+raw_to_stdlog <- function(raw_ticks, x_dw) {
+  mu <- attr(x_dw, "center")
+  sig <- attr(x_dw, "scale")
+  (log(raw_ticks) - mu) / sig
 }
 
-## Inverse transform for axis labels (standardized log → raw), formatted in scientific notation
-inv_standardize_label <- function(x, mean, sd) {
-  # Undo standardization and log transformation
-  raw_log <- x * sd + mean
-  raw_val <- exp(raw_log)
-  
-  # Format as scientific notation with 2 significant digits
-  label_func <- scales::label_scientific(digits = 2)
-  label_func(raw_val)
+# Nice scientific labels for raw ticks
+raw_sci_labels <- function(raw_ticks, digits = 2) {
+  scales::label_scientific(digits = digits)(raw_ticks)
 }
-
-
