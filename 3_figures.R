@@ -14,110 +14,133 @@ source("src/initalize_figure.R")
 # Unique continent levels used for prediction lines
 continents <- unique(webs_country$Continent)
 
+# Alternative colors
+okabe_ito <- c(
+  "North America" = "#CC79A7",
+  "South America" = "#E69F00",
+  "Africa"        = "#009E73",
+  "Europe"        = "#000000",
+  "Asia"          = "red",
+  "Oceania"       = "#56B4E9")
+
 # -------------------------------------------------------
 # Research Investment
 # -------------------------------------------------------
+
 # Build prediction grid varying log_ResInvs_Density across continents;
-# other predictors are held at their (standardized-log) means
-prediction_data <- generate_prediction_data(
-  model = network_use,
+# 1) Prediction data 
+prediction_data_inv <- generate_prediction_data(
+  model = network_use_2,
   data = webs_country,
   continents = continents,
-  xvar = "log_ResInvs_Density",
-  log_AREA_mean = mean(webs_country$log_AREA, na.rm = TRUE),
-  log_SR_mean = mean(webs_country$log_CL_Species_density, na.rm = TRUE)
+  xvar = "log_ResInvs_Density_2",
+  log_AREA_mean = mean(as.numeric(webs_country$log_AREA), na.rm = TRUE),
+  log_SR_mean   = mean(as.numeric(webs_country$log_CL_Species_density), na.rm = TRUE)
 )
 
-# Compute mean and SD of the raw log(R&D density) for inverse-standardization of ticks
-log_resinv_raw <- log(webs_country$ResInvs_Density)
-log_resinv_mean <- mean(log_resinv_raw, na.rm = TRUE)
-log_resinv_sd <- sd(log_resinv_raw, na.rm = TRUE)
+# 2) Converting predictors (std-log) -> raw
+mu  <- attr(webs_country$log_ResInvs_Density_2, "center")
+sig <- attr(webs_country$log_ResInvs_Density_2, "scale")
 
-# Pretty tick marks to show on the raw (unlogged) scale of R&D per km²
-pretty_vals <- c(10, 1000, 10000, 100000,1000000,10000000, 100000000, 1000000000, 10000000000)
+prediction_data_inv$ResInvs_Density_2_raw <- exp(as.numeric(prediction_data_inv$log_ResInvs_Density_2) * sig + mu)
 
-# Convert pretty raw values back to standardized-log scale used on x-axis
-standardized_vals <- (log(pretty_vals) - log_resinv_mean) / log_resinv_sd
+# ordering
+prediction_data_inv <- prediction_data_inv[order(prediction_data_inv$Continent,
+                                                 prediction_data_inv$ResInvs_Density_2_raw), ]
 
-# Plot observed data and model predictions (with 95% ribbons) by continent
+# 3) Ticks (raw) — from the observed range
+pretty_vals_inv <- c(10, 1e2, 1e3, 1e4, 1e5, 1e6)
+
+# Filter
+xr_raw <- range(webs_country$ResInvs_Density_2, na.rm = TRUE)
+pretty_vals_inv <- pretty_vals_inv[pretty_vals_inv >= xr_raw[1] & pretty_vals_inv <= xr_raw[2]]
+
+# 4) Plot:
 ResInvs <- ggplot(webs_country,
-                  aes(x = log_ResInvs_Density, y = Total_webs_by_country, color = Continent)) +
-  geom_point(show.legend = FALSE, size = 2) +                              # observed points
-  geom_line(data = prediction_data, show.legend = FALSE,                   # predicted mean
-            aes(x = log_ResInvs_Density, y = fit, color = Continent), 
-            size = 1) +
-  geom_ribbon(data = prediction_data, show.legend = FALSE,                 # 95% CI ribbon
-              aes(x = log_ResInvs_Density, ymin = lwr, ymax = upr, fill = Continent), 
+                  aes(x = ResInvs_Density_2, y = Total_webs_by_country, color = Continent)) +
+  geom_point(show.legend = FALSE, size = 2) +
+  geom_line(data = prediction_data_inv, show.legend = FALSE,
+            aes(x = ResInvs_Density_2_raw, y = fit, color = Continent),
+            linewidth = 1) +
+  geom_ribbon(data = prediction_data_inv, show.legend = FALSE,
+              aes(x = ResInvs_Density_2_raw, ymin = lwr, ymax = upr, fill = Continent),
               alpha = 0.1, inherit.aes = FALSE) +
-  scale_color_viridis_d() +
-  scale_fill_viridis_d() +
-  scale_x_continuous(                                                       # show raw-scale ticks
-    breaks = standardized_vals,
-    labels = pretty_vals
-  )+
+  scale_color_manual(values = okabe_ito) +
+  scale_fill_manual(values = okabe_ito) +
+  scale_x_log10(
+    breaks = pretty_vals_inv,
+    labels = scales::label_scientific(digits = 1)
+  ) +
   coord_cartesian(ylim = c(0, 100)) +
-  labs(x = expression(bold("Research investment per km"^2*"")), 
+  labs(x = expression(bold("Research investment per km"^2)),
        y = "") +
-  theme_classic()+
+  theme_classic() +
   theme(
-    axis.title = element_text(size = 16),       # axis titles (x and y)
-    axis.text = element_text(size = 14),        # axis tick labels
-    plot.title = element_text(size = 18, face = "bold")  # to add title later
-  ) 
+    axis.title = element_text(size = 16),
+    axis.text  = element_text(size = 14)
+  )
 
-# Display plot
 ResInvs
+
 
 # -------------------------------------------------------
 # Bee species
 # -------------------------------------------------------
 
 # Generate prediction grid for bee species density across continents
+# 1) prediction data 
 prediction_data_sr <- generate_prediction_data(
-  model = network_use,
+  model = network_use_2,
   data = webs_country,
   continents = continents,
   xvar = "log_CL_Species_density",
-  log_AREA_mean = mean(webs_country$log_AREA, na.rm = TRUE),
-  log_SR_mean = mean(webs_country$log_CL_Species_density, na.rm = TRUE))
+  log_AREA_mean = mean(as.numeric(webs_country$log_AREA), na.rm = TRUE),
+  log_SR_mean   = mean(as.numeric(webs_country$log_CL_Species_density), na.rm = TRUE)
+)
 
-# Get mean and SD of the unstandardized log species richness density
-log_sr_raw <- log(webs_country$CL_Species_Density)
-log_sr_mean <- mean(log_sr_raw, na.rm = TRUE)
-log_sr_sd <- sd(log_sr_raw, na.rm = TRUE)
+# 2) Converting predictors
+mu  <- attr(webs_country$log_CL_Species_density, "center")
+sig <- attr(webs_country$log_CL_Species_density, "scale")
 
-# Choose readable raw-scale tick marks for species per km²
-pretty_vals <- c(.000001,.00001,.0001,.001,.01, 0.15 )
+prediction_data_sr$CL_Species_Density_raw <- exp(as.numeric(prediction_data_sr$log_CL_Species_density) * sig + mu)
 
-# Convert raw-scale ticks to standardized-log scale used on x-axis
-standardized_vals <- (log(pretty_vals) - log_sr_mean) / log_sr_sd
+# ordering
+prediction_data_sr <- prediction_data_sr[order(prediction_data_sr$Continent,
+                                               prediction_data_sr$CL_Species_Density_raw), ]
 
-# Plot observed data and model predictions (with 95% ribbons) by continent
+# 3) X axis: breaks/limits range based
+xr_raw   <- range(webs_country$CL_Species_Density, na.rm = TRUE)
+upper_lim <- 10^ceiling(log10(xr_raw[2]))   #(ex.: max=0.43 -> upper_lim=1)
+
+pretty_vals_sr <- c(1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1)
+pretty_vals_sr <- pretty_vals_sr[pretty_vals_sr >= xr_raw[1] & pretty_vals_sr <= upper_lim]
+
+# 4) plot: 
 sr_plot <- ggplot(webs_country,
-                  aes(x = log_CL_Species_density, y = Total_webs_by_country, color = Continent)) +
+                  aes(x = CL_Species_Density, y = Total_webs_by_country, color = Continent)) +
   geom_point(show.legend = FALSE, size = 2) +
   geom_line(data = prediction_data_sr, show.legend = FALSE,
-            aes(x = log_CL_Species_density, y = fit, color = Continent), 
-            size = 1) +
+            aes(x = CL_Species_Density_raw, y = fit, color = Continent),
+            linewidth = 1) +
   geom_ribbon(data = prediction_data_sr, show.legend = FALSE,
-              aes(x = log_CL_Species_density, ymin = lwr, ymax = upr, fill = Continent), 
+              aes(x = CL_Species_Density_raw, ymin = lwr, ymax = upr, fill = Continent),
               alpha = 0.1, inherit.aes = FALSE) +
-  scale_color_viridis_d() +
-  scale_fill_viridis_d() +
-  scale_x_continuous(
-    breaks = standardized_vals,
-    labels = pretty_vals
-  )+
+  scale_x_log10(
+    breaks = pretty_vals_sr,
+    limits = c(xr_raw[1], upper_lim),
+    labels = scales::label_scientific(digits = 1)
+  ) +
+  scale_color_manual(values = okabe_ito) +
+  scale_fill_manual(values = okabe_ito) +
   coord_cartesian(ylim = c(0, 100)) +
-  labs(x = expression(bold("Bee species per km"^2*" (log)")), 
-       y = "Number of Networks") +theme_classic()+
+  labs(x = expression(bold("Bee species per km"^2)),
+       y = "Number of Networks") +
+  theme_classic() +
   theme(
-    axis.title = element_text(size = 16),       # axis titles (x and y)
-    axis.text = element_text(size = 14),        # axis tick labels
-    plot.title = element_text(size = 18, face = "bold")  # if you add title later
-  ) 
+    axis.title = element_text(size = 16),
+    axis.text  = element_text(size = 14)
+  )
 
-# Display plot
 sr_plot
 
 # -------------------------------------------------------
@@ -125,85 +148,117 @@ sr_plot
 # -------------------------------------------------------
 
 # Build prediction grid for AREA across continents
+# 1) Prediction data 
 prediction_data_area <- generate_prediction_data(
-  model = network_use,
+  model = network_use_2,
   data = webs_country,
   continents = continents,
   xvar = "log_AREA",
-  log_AREA_mean = mean(webs_country$log_AREA, na.rm = TRUE),
-  log_SR_mean = mean(webs_country$log_CL_Species_density, na.rm = TRUE))
+  log_AREA_mean = mean(as.numeric(webs_country$log_AREA), na.rm = TRUE),
+  log_SR_mean   = mean(as.numeric(webs_country$log_CL_Species_density), na.rm = TRUE)
+)
 
-# Get mean and SD of unstandardized log(AREA) for tick back-transformation
-log_area_raw <- log(webs_country$AREA)
-log_area_mean <- mean(log_area_raw, na.rm = TRUE)
-log_area_sd <- sd(log_area_raw, na.rm = TRUE)
+# 2) Convert predictors (std-log) -> raw AREA (km²)
+mu  <- attr(webs_country$log_AREA, "center")
+sig <- attr(webs_country$log_AREA, "scale")
 
-# Raw-scale tick values (km²) to display on x-axis
-pretty_vals <- c(10, 100, 1000, 10000, 100000,1000000,10000000, 100000000, 1000000000, 10000000000)
+prediction_data_area$AREA_raw <- exp(as.numeric(prediction_data_area$log_AREA) * sig + mu)
 
-# Convert raw-scale ticks to standardized-log scale used on x-axis
-standardized_vals <- (log(pretty_vals) - log_area_mean) / log_area_sd
+# ordering
+prediction_data_area <- prediction_data_area[order(prediction_data_area$Continent,
+                                                   prediction_data_area$AREA_raw), ]
 
-# Plot observed data and model predictions (with 95% ribbons) by continent
+# 3) X axis: breaks/limits range based
+xr_raw    <- range(webs_country$AREA, na.rm = TRUE)   # c(7, 9959828)
+upper_lim <- 10^ceiling(log10(xr_raw[2]))             # 1e7
+
+pretty_vals_area <- c(10, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7)
+pretty_vals_area <- pretty_vals_area[pretty_vals_area >= xr_raw[1] & pretty_vals_area <= upper_lim]
+
+# 4) plot:
 area_plot <- ggplot(webs_country,
-                    aes(x = log_AREA, y = Total_webs_by_country, color = Continent)) +
+                    aes(x = AREA, y = Total_webs_by_country, color = Continent)) +
   geom_point(show.legend = FALSE, size = 2) +
   geom_line(data = prediction_data_area, show.legend = FALSE,
-            aes(x = log_AREA, y = fit, color = Continent), 
-            size = 1) +
+            aes(x = AREA_raw, y = fit, color = Continent),
+            linewidth = 1) +
   geom_ribbon(data = prediction_data_area, show.legend = FALSE,
-              aes(x = log_AREA, ymin = lwr, ymax = upr, fill = Continent), 
+              aes(x = AREA_raw, ymin = lwr, ymax = upr, fill = Continent),
               alpha = 0.1, inherit.aes = FALSE) +
-  scale_color_viridis_d() +
-  scale_fill_viridis_d() +
-  scale_x_continuous(
-    breaks = standardized_vals,
-    labels = pretty_vals
-  )+
-  coord_cartesian(ylim = c(0, 100)) +
-  labs(x = expression(bold("Area (km"^2*")")), 
-       y = "Number of Networks") +
-  theme_classic()  +
-  theme(
-    axis.title = element_text(size = 16),       # axis titles (x and y)
-    axis.text = element_text(size = 14),        # axis tick labels
-    plot.title = element_text(size = 18, face = "bold")  # if you add title later
+  scale_color_manual(values = okabe_ito) +
+  scale_fill_manual(values = okabe_ito) +
+  scale_x_log10(
+    breaks = pretty_vals_area,
+    limits = c(xr_raw[1], upper_lim),
+    labels = scales::label_scientific(digits = 1)
   ) +
-  guides(color = guide_legend(nrow = 1)) 
+  coord_cartesian(ylim = c(0, 100)) +
+  labs(x = expression(bold("Country area (km"^2*")")),
+       y = "Number of Networks") +
+  theme_classic() +
+  theme(
+    axis.title = element_text(size = 16),
+    axis.text  = element_text(size = 14),
+    plot.title = element_text(size = 18, face = "bold")
+  ) +
+  guides(color = guide_legend(nrow = 1))
 
-# Display plot
 area_plot
 
-# Plot (with legend on the right)
-area_plot_with_legend <- ggplot(webs_country,
-                                aes(x = log_AREA, y = Total_webs_by_country, color = Continent)) +
-  geom_point(show.legend = FALSE, size = 2) +
-  geom_line(data = prediction_data_area, 
-            aes(x = log_AREA, y = fit, color = Continent), 
-            size = 1) +
-  geom_ribbon(data = prediction_data_area, 
-              aes(x = log_AREA, ymin = lwr, ymax = upr, fill = Continent), 
-              alpha = 0.1, inherit.aes = FALSE) +
-  scale_color_viridis_d() +
-  scale_fill_viridis_d() +
-  scale_x_continuous(
-    breaks = standardized_vals,
-    labels = pretty_vals
-  )+
+###
+# Plot (with legend on the right, raw scale + log10)
+area_plot_with_legend <- ggplot(
+  webs_country,
+  aes(x = AREA, y = Total_webs_by_country, color = Continent)
+) +
+  # observed points
+  geom_point(size = 2, alpha = 0.8) +
+  
+  # predictors lines
+  geom_line(
+    data = prediction_data_area,
+    aes(x = AREA_raw, y = fit, color = Continent),
+    linewidth = 1
+  ) +
+  
+  # confidence intervals
+  geom_ribbon(
+    data = prediction_data_area,
+    aes(x = AREA_raw, ymin = lwr, ymax = upr, fill = Continent),
+    alpha = 0.15,
+    inherit.aes = FALSE
+  ) +
+  
+  # colors
+  scale_color_manual(values = okabe_ito, name = "Continent") +
+  scale_fill_manual(values = okabe_ito, name = "Continent") +
+  
+  # X axis log10 (raw)
+  scale_x_log10(
+    breaks = pretty_vals_area,
+    limits = c(xr_raw[1], upper_lim),
+    labels = scales::label_scientific(digits = 1)
+  ) +
+  
   coord_cartesian(ylim = c(0, 100)) +
-  labs(x = expression(bold("Area (km"^2*")")), 
-       y = "") +
-  theme_classic(base_size = 10)  +
+  
+  labs(
+    x = expression(bold("Country area (km"^2*")")),
+    y = "Number of Networks"
+  ) +
+  
+  theme_classic(base_size = 12) +
   theme(
-    axis.title = element_text(size = 16),       # axis titles (x and y)
-    axis.text = element_text(size = 14),        # axis tick labels
-    legend.title = element_text(size = 18),     # legend title
-    legend.text = element_text(size = 16),      # legend labels
-    plot.title = element_text(size = 18, face = "bold")  # if you add title later
-  ) +  theme(legend.position = "right")
+    axis.title   = element_text(size = 16),
+    axis.text    = element_text(size = 14),
+    legend.title = element_text(size = 16),
+    legend.text  = element_text(size = 14),
+    legend.position = "right"
+  )
 
 # Display plot
 area_plot_with_legend
+
 
 # =========================================================
 # Assemble Multi-panel Figure (Patchwork) & Export
@@ -217,15 +272,24 @@ legend_plot <- ggpubr::as_ggplot(legend_obj)
 legend_plot
 
 # Plot combined plots: Bee species, Research investment and Area (km²)
-combined_plot <- (sr_plot + theme(legend.position = "none", plot.tag.position = c(0, 0.98)) + ggtitle("A") | 
-                    ResInvs + theme(legend.position = "none", plot.tag.position = c(0, 0.98)) + ggtitle("B")) / 
-  (area_plot + theme(legend.position = "none", plot.tag.position = c(0, 0.98)) + ggtitle("C") | 
+combined_plot <-
+  (sr_plot + theme(legend.position = "none") |
+     ResInvs + theme(legend.position = "none")) /
+  (area_plot + theme(legend.position = "none") |
      legend_plot + theme(legend.position = "none")) +
-  plot_layout(guides = 'collect')
+  plot_annotation(tag_levels = "A") &
+  theme(plot.tag = element_text(size = 16, face = "bold"),
+        plot.tag.position = c(0, 1))
+
 combined_plot
+
 
 # Export figure
 ggsave(combined_plot, file = paste0(savefilepath, "/Picture2.jpg"), height = 10, width = 12)
+
+ggsave("Picture2.png", combined_plot,
+       width = 12, height = 9, dpi = 600)
+
 
 # =========================================================
 # Network Re-use — Marginal Predictions over Time Since Publication
@@ -239,8 +303,7 @@ sd_years_since_pub <- sd(webs_reuse$years_since_pub, na.rm = TRUE)
 # Create prediction data frame for each continent over a range of log-transformed years
 new_data <- expand.grid(
   log_years_since_pub = seq(min(webs_reuse$log_years_since_pub), max(webs_reuse$log_years_since_pub), length.out = 100),
-  Continent = unique(webs_reuse$Continent)
-)
+  Continent = unique(webs_reuse$Continent))
 
 # Predict without random effects (marginal/predicting average trend)
 preds <- predict(reuse_mod, newdata = new_data, re.form = NA, se.fit = TRUE)
@@ -251,8 +314,7 @@ new_data <- new_data %>%
     fit = exp(preds$fit),  # log_pub_count → pub_count
     lwr = exp(preds$fit - 1.96 * preds$se.fit),
     upr = exp(preds$fit + 1.96 * preds$se.fit),
-    years_since_pub = log_years_since_pub * sd_years_since_pub + mean_years_since_pub
-  )
+    years_since_pub = log_years_since_pub * sd_years_since_pub + mean_years_since_pub)
 
 # Plot observed reuse counts and continent-specific marginal predictions over time
 reuse <- ggplot() +
@@ -270,8 +332,39 @@ reuse <- ggplot() +
 # Display plot
 reuse
 
+# Alternative colors
+# lines over
+reuse <- ggplot() +
+  # 1. Ribbon
+  geom_ribbon(data = new_data,
+              aes(x = years_since_pub, ymin = lwr, ymax = upr, fill = Continent),
+              alpha = 0.15, color = NA) +
+  
+  # 2. Lines
+  geom_line(data = new_data,
+            aes(x = years_since_pub, y = fit, color = Continent),
+            size = 1) +
+  
+  # 3. Points 
+  geom_point(data = webs_reuse,
+             aes(x = years_since_pub, y = pub_count, color = Continent),
+             alpha = 0.6) +
+  
+  coord_cartesian(ylim = c(0, 50)) +
+  scale_color_manual(values = okabe_ito) +
+  scale_fill_manual(values = okabe_ito) +
+  theme_classic(base_size = 14) +
+  labs(x = "Years since publication", y = "Number of Reuses") +
+  theme(legend.title = element_blank())
+
+# Display plot
+reuse
+
 #Export
 ggsave(reuse, file = paste0(savefilepath, "/Picture5.png"), height = 5, width = 12)
+
+ggsave("Picture5.png", reuse,
+       width = 8, height = 4, dpi = 600)
 
 # =========================================================
 # Global Map — Network Counts per Country & Reuse Frequency
