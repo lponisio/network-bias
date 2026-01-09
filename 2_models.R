@@ -88,18 +88,18 @@ hist(webs_country$log_ResInvs_Density_5)
 hist(webs_country$log_CL_Species_density)
 
 # This negative binomial model accounts for dispersion
-network_use_2 <- glm.nb(Total_webs_by_country ~ Continent+
+network_use_2_NA <- glm.nb(Total_webs_by_country ~ Continent+
                         log_ResInvs_Density_2 +
                         log_AREA +
                         log_CL_Species_density,
                       data = webs_country)
 
-summary(network_use_2)
-check_model(network_use_2)
-r2_vals <- performance::r2(network_use_2)
+summary(network_use_2_NA)
+check_model(network_use_2_NA)
+r2_vals <- performance::r2(network_use_2_NA)
 
 # Diagnostics
-check_nb_2 <- check_model(network_use_2)
+check_nb_2 <- check_model(network_use_2_NA)
 png(file.path(savefilepath, "figures", "modelChecks", "check_nb_2.png"),
     width = 1200, height = 800)
 plot(check_nb_2)
@@ -107,7 +107,7 @@ dev.off()
 
 # GLM table for manuscript
 table_country_2 <- format_glm_table(
-  model   = network_use_2,
+  model   = network_use_2_NA,
   caption = "country.mod_continent_2"
 )
 
@@ -189,20 +189,20 @@ webs_reuse <- webs_reuse %>%
 # 3.2 Fit GLMMs (with and without outliers)
 # ----------------------------------------------------------
 
-reuse_mod<- lmer(log_pub_count ~ Continent * log_years_since_pub + (1 | Web_Code_base), data = webs_reuse)
+reuse_mod_NA<- lmer(log_pub_count ~ Continent * log_years_since_pub + (1 | Web_Code_base), data = webs_reuse)
 
 #saving output
-summary(reuse_mod)
-check_reuse <-check_model(reuse_mod)
-r2_vals <- performance::r2(reuse_mod)
+summary(reuse_mod_NA)
+check_reuse <-check_model(reuse_mod_NA)
+r2_vals <- performance::r2(reuse_mod_NA)
 
 png(file.path(savefilepath, "figures", "modelChecks", "check_reuse.png"),
     width = 1200, height = 800)
-plot(check_reuse)
+plot(reuse_mod_NA)
 dev.off()
 
 table_reuse <- format_lmer_table(
-  model   = reuse_mod,
+  model   = reuse_mod_NA,
   caption = "check_reuse.png"
 )
 
@@ -210,7 +210,7 @@ table_reuse <- format_lmer_table(
 
 library(influence.ME)
 
-infl <- influence(reuse_mod, obs = TRUE)   # obs=TRUE gives observation-level influence
+infl <- influence(reuse_mod_NA, obs = TRUE)   # obs=TRUE gives observation-level influence
 
 dfb <- dfbetas(infl)
 

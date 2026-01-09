@@ -57,7 +57,7 @@ col_keep <- c("Web_Code", "pub_count", "Web_Code_base", "Web_Year",
               "ISO3", "Hemisphere", "Country")
 
 webs_reuse_summary <- webs_reuse_summary[, col_keep, drop = FALSE]
-
+x<-webs
 # Merge with main webs data
 webs <- full_join(webs, webs_reuse_summary,
                   by = c("Web_Code", "Country","ISO3","Hemisphere"))
@@ -356,7 +356,7 @@ names(area.richness)[names(area.richness) == "ISO3"] <- "adm0_a3"
 final <- dplyr::left_join(final, area.richness, by = "adm0_a3")
 
 # Save countries with missing key data (ensure folder exists)
-drop_countries <- final[is.na(final$ResInvestTotal_5) |
+drop_countries <- final[is.na(final$ResInvestTotal_2) |
                           is.na(final$CL_Species)    |
                           is.na(final$AREA), ]
 
