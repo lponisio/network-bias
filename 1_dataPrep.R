@@ -127,7 +127,8 @@ webs <- left_join(web_country, webs, by = "ISO3")
 #   (e.g., regional groupings, income categories, aggregates).
 # - Standardize country names and ISO3 codes for consistency.
 # - Select GDP data for the period 2000–2023 and calculate the median 
-#   GDP per country.
+#   GDP per country. We only included countries with atleast 2 years
+#   of data
 # - Identify countries with no recorded plant–pollinator networks and 
 #   assign them a network count of zero.
 # - Merge these zero-network countries into the main dataset so all 
@@ -164,6 +165,9 @@ not.countries <- c(
 # Keep only actual countries; remove regional/income group aggregates
 gdp <- gdp[!gdp$Country.Name %in% not.countries, ]
 
+#total length of countries in GDP
+length(unique(gdp$ISO3))
+
 # Standardize column names for merging
 names(gdp)[names(gdp) == "Country.Code"] <- "ISO3"
 names(gdp)[names(gdp) == "Country.Name"] <- "Country"
@@ -175,9 +179,8 @@ year_columns <- grep("^X(200[0-9]|201[0-9]|2023)$", names(gdp))
 #gdp$GDP.MEDIAN <- apply(gdp[, year_columns], 1, median, na.rm = FALSE)
 
 gdp$GDP.MEDIAN <- apply(gdp[, year_columns], 1, function(x) {
-  if (sum(!is.na(x)) >= 5) median(x, na.rm = TRUE) else NA_real_
+  if (sum(!is.na(x)) >= 1) median(x, na.rm = TRUE) else NA_real_
 })
-
 
 # Identify countries with zero published networks
 countries.no.webs <- gdp[!gdp$ISO3 %in% countries.with.webs, c("ISO3", "Country")]
@@ -194,6 +197,10 @@ countries.no.webs <- countries.no.webs[, colnames(webs)]
 
 # Combine datasets (existing + zero-network countries)
 final <- rbind(webs, countries.no.webs)
+
+#total length of countries in GDP
+length(unique(final$ISO3))
+
 
 # =========================================================
 # Observation:
@@ -309,7 +316,7 @@ res.inv$PropGDP_median_5 <- apply(res.inv[, year_columns], 1, function(x) {
 })
 
 res.inv$PropGDP_median_2 <- apply(res.inv[, year_columns], 1, function(x) {
-  if (sum(!is.na(x)) >= 2) median(x, na.rm = TRUE) else NA_real_
+  if (sum(!is.na(x)) >= 1) median(x, na.rm = TRUE) else NA_real_
 })
 
 # Prepare for merge
